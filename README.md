@@ -1,6 +1,9 @@
 # CGTimer
 CGTimer is an electron app to display current video time from a CasparCG server instance.  
-It is heavily inspired on the looks of https://github.com/dimitry-ishenko-casparcg/timer.
+The app needs to comunicate with the server via [OSC](https://en.wikipedia.org/wiki/Open_Sound_Control), so take care to allow it on your system.  
+
+## Design 
+The design is heavily inspired on the looks of https://github.com/dimitry-ishenko-casparcg/timer.
 
 # Screenshots
 ![](screenshots/Standby.png "Application when first started")
