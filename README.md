@@ -5,6 +5,14 @@ The app needs to comunicate with the server via [OSC](https://en.wikipedia.org/w
 ## Design 
 The design is heavily inspired on the looks of https://github.com/dimitry-ishenko-casparcg/timer.
 
+# Features
+
+- Displays active clip current time
+- Displays remaining clip time
+- Starts flashing red at less than 5 seconds to clip end
+- Warns about video being looped, via a red "L" on the clip time panel
+- When CasparCG is issued a STOP command to the ffmpeg producer, everything is reset
+
 # Screenshots
 <img src="https://github.com/jcalado/cgtimer/raw/master/screenshots/Standby.png" width="400px">
 <img src="https://github.com/jcalado/cgtimer/raw/master/screenshots/Counting.png" width="400px">
