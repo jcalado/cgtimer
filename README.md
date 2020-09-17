@@ -6,9 +6,9 @@ The app needs to comunicate with the server via [OSC](https://en.wikipedia.org/w
 The design is heavily inspired on the looks of https://github.com/dimitry-ishenko-casparcg/timer.
 
 # Screenshots
-![](screenshots/Standby.png "Application when first started")
-![](screenshots/Counting.png "Application showing time for active clip")
-![](screenshots/5%20second%20warning.png "Application showing 5 second warning")
+<img src="https://github.com/jcalado/cgtimer/raw/master/screenshots/Standby.png" width="400px">
+<img src="https://github.com/jcalado/cgtimer/raw/master/screenshots/Counting.png" width="400px">
+<img src="https://github.com/jcalado/cgtimer/raw/master/screenshots/5%20second%20warning.png" width="400px">
 
 # Configuration
 CGTimer expects a CasparCG server configured to output OSC data to port 6251.  
