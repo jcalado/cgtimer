@@ -58,7 +58,7 @@ div > h1 {
 
 @font-face {
   font-family: led;
-  src: url(font/DSEG7Modern-Bold.woff);
+  src: url(../font/DSEG7Modern-Bold.woff);
   font-weight: bold;
 }
 
