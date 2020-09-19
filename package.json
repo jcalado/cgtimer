@@ -2,7 +2,8 @@
   "name": "cgtimer",
   "productName": "cgtimer",
   "version": "1.0.0",
-  "description": "Monitor elapsed and remaining time for CasparCG clips",  "scripts": {
+  "description": "Monitor elapsed and remaining time for CasparCG clips",
+  "scripts": {
     "dev": "electron-webpack dev",
     "compile": "electron-webpack",
     "dist": "yarn compile",
@@ -42,13 +43,14 @@
     }
   },
   "dependencies": {
-    "source-map-support": "^0.5.16",
-    "osc": "^2.4.1"
+    "osc": "^2.4.1",
+    "source-map-support": "^0.5.16"
   },
   "devDependencies": {
     "electron": "10.1.1",
     "electron-builder": "^22.8.1",
     "electron-webpack": "^2.8.2",
-    "webpack": "~4.42.1"
+    "webpack": "~4.42.1",
+    "yarn": "^1.22.5"
   }
 }
