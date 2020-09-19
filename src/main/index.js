@@ -3,6 +3,7 @@
 import { app, BrowserWindow } from 'electron'
 import * as path from 'path'
 import { format as formatUrl } from 'url'
+import { autoUpdater } from "electron-updater"
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -31,6 +32,10 @@ function createMainWindow() {
 
   window.on('closed', () => {
     mainWindow = null
+  })
+
+  window.on('ready-to-show', () => {
+    autoUpdater.checkForUpdatesAndNotify();
   })
 
   window.webContents.on('devtools-opened', () => {

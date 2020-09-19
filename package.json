@@ -1,4 +1,5 @@
 {
+  "appID": "com.joelcalado.cgtimer",
   "name": "cgtimer",
   "productName": "cgtimer",
   "version": "1.0.2",
@@ -15,7 +16,12 @@
     "email": "joelcalado@gmail.com"
   },
   "license": "GPL-3.0-only",
+  "publish": {
+    "provider": "github",
+    "token": "${{ secrets.GH_TOKEN }}"
+  },
   "dependencies": {
+    "electron-updater": "^4.3.5",
     "osc": "^2.4.1",
     "source-map-support": "^0.5.16"
   },
