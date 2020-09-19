@@ -77,11 +77,22 @@ function startOsc() {
 // start reading OSC packets
 startOsc();
 
+function addZero(i) {
+  if (i < 10) {
+    i = "0" + i;
+  }
+  return i;
+}
+
 function getTime() {
   var d = new Date();
-  var n = d.toLocaleTimeString();
-  document.getElementById("time").innerText = n;
+  var x = document.getElementById("demo");
+  var h = addZero(d.getHours());
+  var m = addZero(d.getMinutes());
+  var s = addZero(d.getSeconds());
+  document.getElementById("time").innerText = h + ":" + m + ":" + s;
 }
+
 
 // Tick every 200ms
 setInterval(() => {
