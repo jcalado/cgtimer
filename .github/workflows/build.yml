@@ -18,6 +18,15 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 10
+          
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Compile
+        run: npm run compile
+
+      - name: Dist
+        run: npm run dist
 
       - name: Install Snapcraft
         uses: samuelmeuli/action-snapcraft@v1
