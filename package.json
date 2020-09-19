@@ -2,7 +2,7 @@
   "appID": "com.joelcalado.cgtimer",
   "name": "cgtimer",
   "productName": "cgtimer",
-  "version": "1.0.2",
+  "version": "1.1",
   "description": "Monitor elapsed and remaining time for CasparCG clips",
   "scripts": {
     "dev": "electron-webpack dev",
