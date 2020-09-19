@@ -1,7 +1,7 @@
 {
   "name": "cgtimer",
   "productName": "cgtimer",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Monitor elapsed and remaining time for CasparCG clips",
   "scripts": {
     "dev": "electron-webpack dev",
