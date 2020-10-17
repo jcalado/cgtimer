@@ -41,7 +41,7 @@ function startOsc() {
   udpPort.on("message", function (message, timeTag, info) {
     // Packet contains playing file time
     if (
-      /\/channel\/1\/stage\/layer\/\d{0,2}\/foreground\/file\/time/.test(
+      /\/file\/time/.test(
         message["address"]
       )
     ) {
@@ -53,7 +53,7 @@ function startOsc() {
 
     // Packet contains loop information
     if (
-      /\/channel\/1\/stage\/layer\/\d{0,2}\/foreground\/loop/.test(
+      /\/loop/.test(
         message["address"]
       )
     ) {
