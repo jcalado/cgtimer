@@ -7,7 +7,6 @@ jobs:
       matrix:
         os:
           [
-            { name: 'linux', image: 'ubuntu-latest' },
             { name: 'windows', image: 'windows-latest' },
             { name: 'macos', image: 'macos-latest' },
           ]
