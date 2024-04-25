@@ -4,11 +4,11 @@ Show current time, elapsed and remaining active media time.
 
 # Features
 
-- Displays active clip current time
-- Displays remaining clip time
-- Starts flashing red at less than 5 seconds to clip end
-- Warns about video being looped, via a red "L" on the clip time panel
-- When CasparCG is issued a STOP command to the ffmpeg producer, everything is reset
+- Displays elapsed time
+- Displays remaining time
+- Remaining time turns read at less than 10 seconds to clip end.
+- Warns about the video being looped, via a red "L" on the elapsed time panel
+- When CasparCG is issued a `STOP` command to the ffmpeg producer, everything is reset
 
 # Screenshots
 <img src="https://github.com/jcalado/cgtimer/assets/26873/aacae291-62b9-4b0a-be50-683b0851d5e8" width="400px"/>
