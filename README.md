@@ -19,7 +19,13 @@ The design is heavily inspired on the looks of https://github.com/dimitry-ishenk
 <img src="https://github.com/jcalado/cgtimer/raw/master/screenshots/5%20second%20warning.png" width="400px">
 
 # Configuration
-CGTimer expects a CasparCG server configured to output OSC data to port 6251.  
+
+## Client 
+
+Press `alt` key and the menu should popup. Go to preferences, setup the CasparCG OSC port and channel information.
+
+## Server
+CGTimer expects a CasparCG server configured to output OSC data.  
 You can do this in you caspar.config:
 
 ```

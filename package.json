@@ -1,14 +1,42 @@
 {
-  "appID": "com.joelcalado.cgtimer",
   "name": "cgtimer",
   "productName": "cgtimer",
-  "version": "1.1.1",
-  "description": "Monitor elapsed and remaining time for CasparCG clips",
+  "version": "2.0.0",
+  "description": "Media playback production clocks for CasparCG",
+  "main": ".webpack/main",
   "scripts": {
-    "dev": "electron-webpack dev",
-    "compile": "electron-webpack",
-    "dist": "yarn compile",
-    "dist:dir": "yarn dist --dir -c.compression=store -c.mac.identity=null"
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "eslint --ext .ts,.tsx ."
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.4.0",
+    "@electron-forge/maker-deb": "^7.4.0",
+    "@electron-forge/maker-rpm": "^7.4.0",
+    "@electron-forge/maker-squirrel": "^7.4.0",
+    "@electron-forge/maker-zip": "^7.4.0",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
+    "@electron-forge/plugin-fuses": "^7.4.0",
+    "@electron-forge/plugin-webpack": "^7.4.0",
+    "@electron/fuses": "^1.8.0",
+    "@types/react": "^18.2.79",
+    "@types/react-dom": "^18.2.25",
+    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/parser": "^5.0.0",
+    "@vercel/webpack-asset-relocator-loader": "1.7.3",
+    "copy-webpack-plugin": "^12.0.2",
+    "css-loader": "^6.0.0",
+    "electron": "30.0.1",
+    "eslint": "^8.0.1",
+    "eslint-plugin-import": "^2.25.0",
+    "fork-ts-checker-webpack-plugin": "^7.2.13",
+    "node-loader": "^2.0.0",
+    "style-loader": "^3.0.0",
+    "ts-loader": "^9.2.2",
+    "ts-node": "^10.0.0",
+    "typescript": "~4.5.4"
   },
   "keywords": [],
   "author": {
@@ -16,20 +44,12 @@
     "email": "joelcalado@gmail.com"
   },
   "license": "GPL-3.0-only",
-  "publish": {
-    "provider": "github",
-    "token": "${{ secrets.GH_TOKEN }}"
-  },
   "dependencies": {
-    "electron-updater": "^4.3.5",
-    "osc": "^2.4.1",
-    "source-map-support": "^0.5.16"
-  },
-  "devDependencies": {
-    "electron": "10.1.1",
-    "electron-builder": "^22.8.1",
-    "electron-webpack": "^2.8.2",
-    "webpack": "~4.42.1",
-    "yarn": "^1.22.5"
+    "electron-preferences": "^2.8.2",
+    "electron-squirrel-startup": "^1.0.0",
+    "osc": "^2.4.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "update-electron-app": "^3.0.0"
   }
 }

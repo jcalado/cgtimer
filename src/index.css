@@ -16,17 +16,29 @@ body {
 
 }
 
+.app {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  height: 100vh;
+  gap: 10px;
+}
+
 body .monitor {
   flex:1;
   background-color: #242424;
-  height: 100%;
   margin: 10px;
   box-shadow: 0px 4px 5px rgb(22, 22, 22);
   position: relative;
   padding: 0px 40px;
 }
 
-div > p {
+.monitor.ending h1 + div{
+  color: #FF0000;
+}
+
+div > h1 + div {
   font-size: clamp(1vh, 15vw, 20vh);
   font-weight: bold;
   text-align: center;
@@ -58,11 +70,11 @@ div > h1 {
 
 @font-face {
   font-family: led;
-  src: url(../font/DSEG7Modern-Bold.woff);
+  src: url(../src/assets//fonts/DSEG7Modern-Bold.ttf);
   font-weight: bold;
 }
 
-h2#loopWarning {
+#loop {
   position: absolute;
   top: 0px;
   right: 10px;

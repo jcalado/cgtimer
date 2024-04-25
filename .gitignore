@@ -85,5 +85,8 @@ typings/
 # Webpack
 .webpack/
 
-# Electron-Builder
-dist/*
+# Vite
+.vite/
+
+# Electron-Forge
+out/
