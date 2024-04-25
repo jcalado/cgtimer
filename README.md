@@ -14,9 +14,7 @@ The design is heavily inspired on the looks of https://github.com/dimitry-ishenk
 - When CasparCG is issued a STOP command to the ffmpeg producer, everything is reset
 
 # Screenshots
-<img src="https://github.com/jcalado/cgtimer/raw/master/screenshots/Standby.png" width="400px">
-<img src="https://github.com/jcalado/cgtimer/raw/master/screenshots/Counting.png" width="400px">
-<img src="https://github.com/jcalado/cgtimer/raw/master/screenshots/5%20second%20warning.png" width="400px">
+<img src="https://github.com/jcalado/cgtimer/assets/26873/aacae291-62b9-4b0a-be50-683b0851d5e8" width="400px"/>
 
 # Configuration
 
