@@ -17,7 +17,7 @@ const config: ForgeConfig = {
     icon: './src/assets/icon',
   },
   rebuildConfig: {},
-  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
+  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerDeb({})],
   publishers: [
     {
       name: '@electron-forge/publisher-github',
