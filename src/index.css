@@ -102,3 +102,16 @@ div > h1 {
     opacity: 0;
   }
 }
+
+.columns {
+  display: flex;
+  flex-direction: row;
+}
+
+.columns div > h1 + div {
+  font-size: clamp(1vh, 8vw, 20vh);
+}
+
+.columns div {
+  padding-bottom: 1rem;
+}

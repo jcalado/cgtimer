@@ -18,35 +18,64 @@ function App() {
     remainingTime: 0,
     loop: false,
     stopped: false,
+    enableProductionClock: false,
+    startTime: 0,
+    runtime: 0,
+
   });
 
   useEffect(() => {
-    window.api.receive("display:reset", () => {
+
+
+    const displayResetListener = () => {
       setState({
         currentTime: 0,
         totalTime: 0,
         remainingTime: 0,
         loop: false,
         stopped: false,
+        startTime: 0,
+        runtime: 0,
+        enableProductionClock: false,
       });
-    });
+    }
 
-    window.api.receive("timers:update", (event: any, arg: any) => {
+    const timersListener = (event: any, arg: any) => {
       setState({
         ...state,
         ...arg,
       });
-    });
+    }
+
+    window.api.receive('display:reset', displayResetListener);
+    window.api.receive('timers:update', timersListener);
+
+
+    return ()=>{
+      window.api.removeListener('display:reset', displayResetListener);
+      window.api.removeListener('timers:update', timersListener);
+    }
   }, []);
 
   const isEnding = state.remainingTime <= 10;
 
   return (
     <div className="app">
+      <div className={state.enableProductionClock ? "columns" : ""}>
       <div className="monitor">
-        <h1>Time</h1>
+        <h1>Clock</h1>
         <div id="time">{clockTime()}</div>
+        
       </div>
+      {state.enableProductionClock ? (
+              <div className="monitor">
+              <h1>Production</h1>
+              <div id="time">{state.runtime}</div>
+            </div>
+      ) : null}
+
+      </div>
+      
       <div className="monitor">
         <h2 id="loop">{state.loop ? "L" : null}</h2>
         <h1>Elapsed</h1>

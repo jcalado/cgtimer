@@ -1,15 +1,24 @@
-import { app, Menu } from "electron";
+import { app, Menu, screen } from "electron";
 import path from "path";
 import ElectronPreferences from "electron-preferences";
 
+const displays = () => {
+  return screen.getAllDisplays().map((display, index) => {
+    return {
+      label: `Display ${display.id} - ${display.label}`,
+      value: display.id,
+    };
+  });
+};
+
 class settings {
-  prefs: any;
-  constructor(){
-      this.prefs = this.preferences;
+  prefs: typeof ElectronPreferences;
+  constructor() {
+    this.prefs = this.preferences;
   }
 
   public show = () => {
-      this.prefs().show();
+    this.prefs().show();
   };
 
   private preferences = (): typeof ElectronPreferences => {
@@ -20,12 +29,17 @@ class settings {
           port: 6251,
           channel: 1,
         },
+        production: {
+          enable: false,
+          start: "10:00",
+          runtime: "00:30",
+        }
       },
-    
+
       dataStore: path.resolve(app.getPath("userData"), "preferences.json"),
-    
+
       browserWindowOpts: {
-        title: 'My custom preferences title',
+        title: "My custom preferences title",
         width: 900,
         maxWidth: 1000,
         height: 700,
@@ -34,21 +48,21 @@ class settings {
         maximizable: false,
         //...
       },
-    
+
       menu: Menu.buildFromTemplate([
         {
-          label: 'Window',
-          role: 'window',
+          label: "Window",
+          role: "window",
           submenu: [
             {
-              label: 'Close',
-              accelerator: 'CmdOrCtrl+W',
-              role: 'close',
+              label: "Close",
+              accelerator: "CmdOrCtrl+W",
+              role: "close",
             },
           ],
         },
       ]),
-    
+
       // Preference sections visible to the UI
       sections: [
         {
@@ -79,11 +93,77 @@ class settings {
             ],
           },
         },
-        // ...
+        {
+          id: "application",
+          label: "Application",
+          icon: "settings-gear-63",
+          form: {
+            groups: [
+              {
+                label: "Display",
+                fields: [
+                  {
+                    label: "Display",
+                    key: "display",
+                    type: "dropdown",
+                    options: displays(),
+                    help: "You might want to set this to an external display.",
+                  },
+                  {
+                    label: "Fullscreen",
+                    key: "fullscreen",
+                    type: "radio",
+                    options: [
+                      { label: "No", value: false },
+                      { label: "Yes", value: true },
+                    ],
+                    help: "Start in fullscreen mode",
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        {
+          id: "production",
+          label: "Production",
+          icon: "settings-gear-63",
+          form: {
+            groups: [
+              {
+                label: "Production",
+                fields: [
+                  {
+                    label: "Enable production clock",
+                    key: "enable",
+                    type: "radio",
+                    options: [
+                      { label: "No", value: false },
+                      { label: "Yes", value: true },
+                    ],
+                    help: "Splits clock in two clocks. A live clock and a production clock",
+                  },
+                  {
+                    label: "Start time",
+                    key: "start",
+                    type: "text",
+                    help: "The time the production starts",
+                  },
+                  {
+                    label: "Runtime",
+                    key: "runtime",
+                    type: "text",
+                    help: "Approximate runtime of the production",
+                    
+                  },
+                ],
+              },
+            ],
+          },
+        },
       ],
     });
-
-  }
+  };
 }
 
 export default settings;

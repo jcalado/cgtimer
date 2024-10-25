@@ -1,7 +1,7 @@
 {
   "name": "cgtimer",
   "productName": "cgtimer",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Media playback production clocks for CasparCG",
   "main": ".webpack/main",
   "repository": "https://github.com/jcalado/cgtimer",
@@ -47,6 +47,7 @@
   },
   "license": "GPL-3.0-only",
   "dependencies": {
+    "date-fns": "^3.6.0",
     "electron-preferences": "^2.8.2",
     "electron-squirrel-startup": "^1.0.0",
     "osc": "^2.4.4",
