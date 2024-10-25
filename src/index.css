@@ -48,12 +48,10 @@ div > h1 + div {
 }
 
 #time {
-  color: #FF0000;
   text-shadow: 0px 3px rgb(102 0 0);
 }
 
 #currentTime {
-  color: #00FF00;
   text-shadow: 0px 3px rgb(0 102 0);
 }
 

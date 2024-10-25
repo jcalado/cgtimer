@@ -19,6 +19,10 @@ function App() {
     loop: false,
     stopped: false,
     enableProductionClock: false,
+    elapsedColor: "",
+    remainingColor: "",
+    clockColor: "",
+    productionColor: "",
     startTime: 0,
     runtime: 0,
 
@@ -37,6 +41,10 @@ function App() {
         startTime: 0,
         runtime: 0,
         enableProductionClock: false,
+        elapsedColor: "",
+        remainingColor: "",
+        clockColor: "",
+        productionColor: "",
       });
     }
 
@@ -64,13 +72,13 @@ function App() {
       <div className={state.enableProductionClock ? "columns" : ""}>
       <div className="monitor">
         <h1>Clock</h1>
-        <div id="time">{clockTime()}</div>
+        <div id="time " style={{color: state.clockColor}}>{clockTime()}</div>
         
       </div>
       {state.enableProductionClock ? (
               <div className="monitor">
               <h1>Production</h1>
-              <div id="time">{state.runtime}</div>
+              <div id="time" style={{color: state.productionColor}}>{state.runtime}</div>
             </div>
       ) : null}
 
@@ -79,11 +87,11 @@ function App() {
       <div className="monitor">
         <h2 id="loop">{state.loop ? "L" : null}</h2>
         <h1>Elapsed</h1>
-        <div id="currentTime">{toTime(state.currentTime)}</div>
+        <div id="currentTime" style={{color: state.elapsedColor}}>{toTime(state.currentTime)}</div>
       </div>
       <div className={isEnding ? "monitor ending" : "monitor"}>
         <h1>Remaining</h1>
-        <div id="remainingTime">{toTime(state.remainingTime)}</div>
+        <div id="remainingTime" style={{color: state.remainingColor}}>{toTime(state.remainingTime)}</div>
       </div>
     </div>
   );

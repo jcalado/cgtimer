@@ -31,8 +31,14 @@ class settings {
         },
         production: {
           enable: false,
-          start: "10:00",
-          runtime: "00:30",
+          start: "00:10:00",
+          runtime: "00:20:00",
+        },
+        colors: {
+          clock: "#960000",
+          production: "#960000",
+          elapsed: "#00FF00",
+          remaining: "#FF0000",
         }
       },
 
@@ -161,6 +167,49 @@ class settings {
             ],
           },
         },
+        {
+          id: "colors",
+          label: "Colors",
+          icon: "image",
+          form: {
+            groups: [
+              {
+                label: "Clocks",
+                fields: [
+                  {
+                    label: "Clock",
+                    key: "clock",
+                    type: "color",
+                    format: "hex",
+                  },
+                  {
+                    label: "Production",
+                    key: "production",
+                    type: "color",
+                    format: "hex",
+                  },
+                ],
+              },
+              {
+                label: "Playout clocks",
+                fields: [
+                  {
+                    label: "Elapsed",
+                    key: "elapsed",
+                    type: "color",
+                    format: "hex",
+                  },
+                  {
+                    label: "Remaining",
+                    key: "remaining",
+                    type: "color",
+                    format: "hex",
+                  },
+                ],
+              },
+            ],
+          }
+        }
       ],
     });
   };

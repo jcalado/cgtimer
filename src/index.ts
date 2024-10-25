@@ -105,6 +105,10 @@ const createWindow = (): void => {
       loop: osc.loop,
       stopped: osc.stopped,
       enableProductionClock: appSettings.prefs().value("production.enable"),
+      elapsedColor: appSettings.prefs().value("colors.elapsed"),
+      remainingColor: appSettings.prefs().value("colors.remaining"),
+      clockColor: appSettings.prefs().value("colors.clock"),
+      productionColor: appSettings.prefs().value("colors.production"),
       startTime: appSettings.prefs().value("production.start"),
       runtime: runtimeClock(
         appSettings.prefs().value("production.start"),
@@ -115,11 +119,10 @@ const createWindow = (): void => {
 };
 
 const runtimeClock = (startTime: string, runtime: string) => {
+
   if (!startTime || !runtime) {
     return "00:00:00";
   }
-
-  console.log(startTime, runtime);
 
   const timeFormat = /^(\d{2}:\d{2}:\d{2})$/;
 
