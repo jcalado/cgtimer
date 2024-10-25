@@ -11,7 +11,7 @@ const displays = () => {
   });
 };
 
-class settings {
+class Settings {
   prefs: typeof ElectronPreferences;
   constructor() {
     this.prefs = this.preferences;
@@ -215,4 +215,4 @@ class settings {
   };
 }
 
-export default settings;
+export default Settings;
