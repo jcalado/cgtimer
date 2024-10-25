@@ -2,18 +2,18 @@ html {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #1E1E1E;
+  background-color: #1e1e1e;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
   margin: auto;
   display: flex;
   align-items: center;
   flex-direction: column;
   height: 100%;
   width: 100%;
-
 }
 
 .app {
@@ -25,17 +25,20 @@ body {
   gap: 10px;
 }
 
-body .monitor {
-  flex:1;
+.monitor {
+  flex: 1;
   background-color: #242424;
-  margin: 10px;
+  height: 100%;
   box-shadow: 0px 4px 5px rgb(22, 22, 22);
   position: relative;
   padding: 0px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
-.monitor.ending h1 + div{
-  color: #FF0000;
+.monitor.ending h1 + div {
+  color: #ff0000;
 }
 
 div > h1 + div {
@@ -43,18 +46,9 @@ div > h1 + div {
   font-weight: bold;
   text-align: center;
   margin: 0;
-  font-family: 'led';
-  color:white;
+  font-family: "led";
+  color: white;
 }
-
-#time {
-  text-shadow: 0px 3px rgb(102 0 0);
-}
-
-#currentTime {
-  text-shadow: 0px 3px rgb(0 102 0);
-}
-
 
 div > h1 {
   font-size: 1.5vw;
@@ -86,7 +80,7 @@ div > h1 {
   animation: blink-animation 2s cubic-bezier(0.075, 0.82, 0.165, 1) infinite;
 }
 @keyframes blink-animation {
-50% {
+  50% {
     opacity: 0;
   }
 }
@@ -96,7 +90,7 @@ div > h1 {
   color: red;
 }
 @keyframes blink-red {
-50% {
+  50% {
     opacity: 0;
   }
 }
@@ -104,12 +98,13 @@ div > h1 {
 .columns {
   display: flex;
   flex-direction: row;
+  gap: 10px;
 }
 
 .columns div > h1 + div {
   font-size: clamp(1vh, 8vw, 20vh);
 }
 
-.columns div {
-  padding-bottom: 1rem;
+.flexi {
+  flex: 1;
 }

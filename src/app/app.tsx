@@ -69,7 +69,7 @@ function App() {
 
   return (
     <div className="app">
-      <div className={state.enableProductionClock ? "columns" : ""}>
+      <div className={state.enableProductionClock ? "flexi columns" : "flexi"}>
       <div className="monitor">
         <h1>Clock</h1>
         <div id="time " style={{color: state.clockColor}}>{clockTime()}</div>
