@@ -154,14 +154,25 @@ class Settings {
                     key: "start",
                     type: "text",
                     help: "The time the production starts",
+                    hideFunction: (preferences: typeof ElectronPreferences) => { return (!preferences.production.enable && !preferences.production.ontime) }
                   },
                   {
                     label: "Runtime",
                     key: "runtime",
                     type: "text",
                     help: "Approximate runtime of the production",
-                    
+                    hideFunction: (preferences: typeof ElectronPreferences) => { return !preferences.production.enable && !preferences.production.ontime}   
                   },
+                  {
+                    label: "ontime",
+                    key: "ontime",
+                    type: "radio",
+                    options: [
+                      { label: "No", value: false },
+                      { label: "Yes", value: true },
+                    ],
+                    help: "Use ontime for production clock start time and remaining time",
+                  }
                 ],
               },
             ],

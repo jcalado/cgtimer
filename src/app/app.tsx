@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { Utils } from "../utils";
 
 function toTime(seconds: number) {
   return new Date(seconds * 1000).toISOString().substr(11, 8);
@@ -19,6 +20,8 @@ function App() {
     loop: false,
     stopped: false,
     enableProductionClock: false,
+    enableOntime: false,
+    ontimeCurrent: 0,
     elapsedColor: "",
     remainingColor: "",
     clockColor: "",
@@ -29,8 +32,6 @@ function App() {
   });
 
   useEffect(() => {
-
-
     const displayResetListener = () => {
       setState({
         currentTime: 0,
@@ -41,6 +42,8 @@ function App() {
         startTime: 0,
         runtime: 0,
         enableProductionClock: false,
+        enableOntime: false,
+        ontimeCurrent: 0,
         elapsedColor: "",
         remainingColor: "",
         clockColor: "",
@@ -65,7 +68,56 @@ function App() {
     }
   }, []);
 
-  const isEnding = state.remainingTime <= 10;
+  // Status enum
+  const Status = {
+    RUNNING: 0,
+    HALFWAY: 1,
+    ENDING: 2,
+    ENDED: 3,
+  };
+
+  const status = () => {
+    if (state.remainingTime <= 0) {
+      return Status.ENDED;
+    }
+
+    if (state.remainingTime <= state.totalTime / 4) {
+      return Status.ENDING;
+    }
+
+    if (state.remainingTime <= state.totalTime / 2) {
+      return Status.HALFWAY;
+    }
+
+    return Status.RUNNING;
+
+  }
+
+  const remainingClassName = () => {
+    switch (status()) {
+      case Status.RUNNING:
+        return "monitor";
+      case Status.HALFWAY:
+        return "monitor halfway";
+      case Status.ENDING:
+        return "monitor ending";
+      case Status.ENDED:
+        return "monitor ended";
+    }
+  }
+
+  const remainingTimeColor = () => {
+    switch (status()) {
+      case Status.RUNNING:
+        return state.remainingColor;
+      case Status.HALFWAY:
+        return "orange";
+      case Status.ENDING:
+        return "red";
+      case Status.ENDED:
+        return "red";
+    }
+  }
 
   return (
     <div className="app">
@@ -78,20 +130,20 @@ function App() {
       {state.enableProductionClock ? (
               <div className="monitor">
               <h1>Production</h1>
-              <div id="time" style={{color: state.productionColor}}>{state.runtime}</div>
+              <div id="time" style={{color: state.productionColor}}>{state.enableOntime ? Utils.msToTime(state.ontimeCurrent) : state.runtime}</div>
             </div>
       ) : null}
 
       </div>
       
       <div className="monitor">
-        <h2 id="loop">{state.loop ? "L" : null}</h2>
+        <h2 id="loop">{state.loop ? "LOOP" : null}</h2>
         <h1>Elapsed</h1>
         <div id="currentTime" style={{color: state.elapsedColor}}>{toTime(state.currentTime)}</div>
       </div>
-      <div className={isEnding ? "monitor ending" : "monitor"}>
+      <div className={remainingClassName()}>
         <h1>Remaining</h1>
-        <div id="remainingTime" style={{color: state.remainingColor}}>{toTime(state.remainingTime)}</div>
+        <div id="remainingTime" style={{color: remainingTimeColor()}}>{toTime(state.remainingTime)}</div>
       </div>
     </div>
   );

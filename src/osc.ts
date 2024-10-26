@@ -1,13 +1,14 @@
 // @ts-ignore
 import osc from "osc";
 import { ElectronPreferences } from "electron-preferences";
-import { ipcMain, BrowserWindow } from "electron";
+import { Utils } from './utils';
 
 class oscListener {
   port: number;
   currentTime: number;
   remainingTime: number;
   totalTime: number;
+  ontimeCurrent: number;
   loop: boolean;
   stopped: boolean;
   udpPort: osc.UDPPort | undefined;
@@ -17,6 +18,7 @@ class oscListener {
     this.currentTime = 0;
     this.remainingTime = 0;
     this.totalTime = 0;
+    this.ontimeCurrent = 0;
     this.loop = false;
     this.stopped = false;
     this.udpPort = undefined;
@@ -33,10 +35,26 @@ class oscListener {
       metadata: true,
     });
 
-    const channel = this.preferences.value("server.channel");
+    
 
     this.udpPort.on("message", (message: any, timetag: any, info: any) => {
-      const address = message["address"];
+      // If the message startes with /channel/ then it is a CCG message
+      if (message["address"].startsWith("/channel/")) {
+        this.parseCCGMessage(message);
+      }
+
+      if (message["address"].startsWith("/from-ontime/")) {
+        this.parseOntimeMessage(message);
+      }
+
+    });
+
+    this.udpPort.open();
+  };
+
+  private parseCCGMessage = (message: any) => {
+    const channel = this.preferences.value("server.channel");
+    const address = message["address"];
       const args = message["args"];
       const isFromActiveChannel = new RegExp(`/channel/${channel}`).test(
         address
@@ -62,10 +80,23 @@ class oscListener {
       if (isLoopMessage) {
         this.loop = args[0]["value"];
       }
-    });
+  }
 
-    this.udpPort.open();
-  };
+  private parseOntimeMessage = (message: any) => {
+    const args = message["args"];
+
+    if (message["address"].startsWith("/from-ontime/current")) {
+      if (args[0]["value"] == "null") {
+        this.ontimeCurrent = 0;
+      } else {
+        this.ontimeCurrent = args[0]["value"];
+      }
+    }
+
+    // if (message["address"].startsWith("/from-ontime/expectedFinish")) {
+    //   console.log(Utils.msToTime(args[0]["value"]));
+    // }
+  }
 
   public stop = () => {
     if (this.udpPort) {

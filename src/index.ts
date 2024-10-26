@@ -107,6 +107,8 @@ const createWindow = (): void => {
       loop: osc.loop,
       stopped: osc.stopped,
       enableProductionClock: prefs.value("production.enable"),
+      enableOntime: prefs.value("production.ontime"),
+      ontimeCurrent: osc.ontimeCurrent,
       elapsedColor: prefs.value("colors.elapsed"),
       remainingColor: prefs.value("colors.remaining"),
       clockColor: prefs.value("colors.clock"),
