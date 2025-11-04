@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, screen } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, screen, Display } from "electron";
 import { updateElectronApp } from "update-electron-app";
 import settings from './settings';
 import oscListener from "./osc";
@@ -23,26 +23,72 @@ if (require("electron-squirrel-startup")) {
 
 const isMac = process.platform === "darwin";
 const isDebug = process.env.NODE_ENV === "development";
+const appSettings = new settings();
+let mainWindow: BrowserWindow | null = null;
 let timer: NodeJS.Timeout;
 
+const getDisplayOrigin = (display: Display) => {
+  if (display.bounds) {
+    return { x: display.bounds.x, y: display.bounds.y };
+  }
+
+  const nativeOrigin = (display as any).nativeOrigin;
+  return {
+    x: nativeOrigin?.x || 0,
+    y: nativeOrigin?.y || 0,
+  };
+};
+
+const moveWindowToPreferredDisplay = (window: BrowserWindow, prefs: any) => {
+  if (!window || window.isDestroyed()) {
+    return;
+  }
+
+  const targetDisplayId = prefs.value("application.display");
+  const displays = screen.getAllDisplays();
+  const targetDisplay =
+    displays.find(
+      (display) => display.id.toString() === String(targetDisplayId)
+    ) || screen.getPrimaryDisplay();
+
+  if (!targetDisplay) {
+    return;
+  }
+
+  const { width, height } = window.getBounds();
+  const { x, y } = getDisplayOrigin(targetDisplay);
+  window.setBounds({ x, y, width, height }, false);
+
+  const shouldBeFullscreen = !!prefs.value("application.fullscreen");
+  if (window.isFullScreen() !== shouldBeFullscreen) {
+    window.setFullScreen(shouldBeFullscreen);
+  }
+};
+
+const registerDisplayChangeHandlers = (window: BrowserWindow, prefs: any) => {
+  const reposition = () => moveWindowToPreferredDisplay(window, prefs);
+
+  screen.on("display-added", reposition);
+  screen.on("display-removed", reposition);
+  screen.on("display-metrics-changed", reposition);
+
+  window.on("closed", () => {
+    screen.removeListener("display-added", reposition);
+    screen.removeListener("display-removed", reposition);
+    screen.removeListener("display-metrics-changed", reposition);
+  });
+};
+
 const createWindow = (): void => {
-  const appSettings = new settings();
   const prefs = appSettings.prefs();
-  const targetScreen = screen
-    .getAllDisplays()
-    .find(
-      (display) =>
-        display.id.toString() ===
-        prefs.value("application.display")
-    );
 
   const osc = new oscListener(appSettings.prefs);
 
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    x: targetScreen?.nativeOrigin?.x || 0,
-    y: targetScreen?.nativeOrigin?.y || 0,
-    fullscreen: prefs.value("application.fullscreen") || false,
+  mainWindow = new BrowserWindow({
+    x: 0,
+    y: 0,
+    fullscreen: false,
     height: 600,
     width: 800,
     webPreferences: {
@@ -51,8 +97,11 @@ const createWindow = (): void => {
     autoHideMenuBar: true,
   });
 
+  moveWindowToPreferredDisplay(mainWindow, prefs);
+  registerDisplayChangeHandlers(mainWindow, prefs);
+
   ipcMain.on("display:reset", () => {
-    mainWindow.webContents.send("display:reset");
+    mainWindow?.webContents.send("display:reset");
   });
 
   // and load the index.html of the app.
@@ -61,10 +110,11 @@ const createWindow = (): void => {
   mainWindow.on("closed", () => {
     clearInterval(timer);
     timer = null;
+    mainWindow = null;
   });
 
   // Open the DevTools.
-  if (isDebug) {
+  if (isDebug && mainWindow) {
     mainWindow.webContents.openDevTools();
   }
 
@@ -100,7 +150,7 @@ const createWindow = (): void => {
   Menu.setApplicationMenu(menu);
 
   timer = setInterval(() => {
-    mainWindow.webContents.send("timers:update", {
+    mainWindow?.webContents.send("timers:update", {
       currentTime: osc.currentTime,
       totalTime: osc.totalTime,
       remainingTime: osc.remainingTime,
