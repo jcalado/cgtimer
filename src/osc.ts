@@ -10,8 +10,9 @@ class oscListener {
   loop: boolean;
   stopped: boolean;
   udpPort: UDPPort | undefined;
+  onLayoutLoad?: (layoutName: string) => void;
 
-  constructor() {
+  constructor(onLayoutLoad?: (layoutName: string) => void) {
     this.currentTime = 0;
     this.remainingTime = 0;
     this.totalTime = 0;
@@ -19,6 +20,7 @@ class oscListener {
     this.loop = false;
     this.stopped = false;
     this.udpPort = undefined;
+    this.onLayoutLoad = onLayoutLoad;
 
     this.start();
 
@@ -37,6 +39,14 @@ class oscListener {
     
 
     this.udpPort.on("message", (message: OSCMessage) => {
+      if (message["address"] === "/layout/load" || message["address"] === "/layout/select") {
+        const [firstArg] = message["args"] || [];
+        if (typeof firstArg?.value === "string" && this.onLayoutLoad) {
+          this.onLayoutLoad(firstArg.value);
+        }
+        return;
+      }
+
       // If the message startes with /channel/ then it is a CCG message
       if (message["address"].startsWith("/channel/")) {
         this.parseCCGMessage(message);

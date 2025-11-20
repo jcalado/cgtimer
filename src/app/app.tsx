@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import GridLayout, { Layout } from "react-grid-layout";
 import {
   Ban,
+  GripVertical,
   Maximize2,
   Minimize2,
   Palette,
@@ -369,12 +370,22 @@ function App() {
   const [draftItems, setDraftItems] = useState<WidgetLayoutItem[]>(
     initialLayouts[0]?.items ?? []
   );
+  const layoutsRef = useRef<SavedLayout[]>(initialLayouts);
   const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null);
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [showEditor, setShowEditor] = useState(true);
   const [gridWidth, setGridWidth] = useState<number>(
     typeof window !== "undefined" ? window.innerWidth - 32 : 1200
   );
+  const [dockState, setDockState] = useState(() => {
+    const baseWidth =
+      typeof window !== "undefined"
+        ? Math.max(240, Math.round(window.innerWidth * 0.2))
+        : 260;
+    return { x: 12, y: 12, width: baseWidth };
+  });
+  const dockDragRef = useRef<{ dx: number; dy: number } | null>(null);
+  const dockResizeRef = useRef<{ startWidth: number; startX: number } | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const dragOriginRef = useRef<WidgetLayoutItem[] | null>(null);
 
@@ -494,6 +505,7 @@ function App() {
   }, [selectedLayout]);
 
   useEffect(() => {
+    layoutsRef.current = layouts;
     if (!layouts.length) return;
     persistLayouts(layouts);
   }, [layouts]);
@@ -525,6 +537,56 @@ function App() {
     });
     return () => cancelAnimationFrame(id);
   }, [showEditor, mode]);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (dockDragRef.current) {
+        setDockState((prev) => {
+          const x = event.clientX - dockDragRef.current!.dx;
+          const y = event.clientY - dockDragRef.current!.dy;
+          return { ...prev, x: Math.max(8, x), y: Math.max(8, y) };
+        });
+      } else if (dockResizeRef.current) {
+        const delta = event.clientX - dockResizeRef.current.startX;
+        setDockState((prev) => ({
+          ...prev,
+          width: Math.max(200, dockResizeRef.current!.startWidth + delta),
+        }));
+      }
+    };
+
+    const handleMouseUp = () => {
+      dockDragRef.current = null;
+      dockResizeRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleLayoutLoad = (_event: unknown, layoutName: string) => {
+      const currentLayouts = layoutsRef.current;
+      const target = currentLayouts.find(
+        (layout) => layout.name.toLowerCase() === String(layoutName).toLowerCase()
+      );
+      if (!target) return;
+      setSelectedLayoutId(target.id);
+      setDraftItems(target.items);
+      setMode("preview");
+      setShowEditor(false);
+    };
+
+    window.api.receive("layout:load", handleLayoutLoad);
+    return () => {
+      window.api.removeListener("layout:load", handleLayoutLoad);
+    };
+  }, []);
 
   const handleLayoutChange = (newLayout: Layout[]) => {
     if (!isEditing) return;
@@ -558,6 +620,23 @@ function App() {
 
     setDraftItems(normalizedLayout);
     dragOriginRef.current = null;
+  };
+
+  const handleDockDragStart = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dockDragRef.current = {
+      dx: event.clientX - dockState.x,
+      dy: event.clientY - dockState.y,
+    };
+  };
+
+  const handleDockResizeStart = (event: React.MouseEvent) => {
+    dockResizeRef.current = {
+      startWidth: dockState.width,
+      startX: event.clientX,
+    };
+    event.stopPropagation();
   };
 
   const handleAddWidget = (widgetKey: WidgetKind) => {
@@ -663,6 +742,20 @@ function App() {
     };
     setLayouts((prev) => [...prev, copy]);
     setSelectedLayoutId(copy.id);
+  };
+
+  const handleRenameLayout = () => {
+    if (!selectedLayout) return;
+    const name = prompt("New name for layout?", selectedLayout.name);
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const updated = layouts.map((layout) =>
+      layout.id === selectedLayout.id
+        ? { ...layout, name: trimmed, updatedAt: Date.now() }
+        : layout
+    );
+    setLayouts(updated);
   };
 
   const handleDeleteLayout = () => {
@@ -871,8 +964,15 @@ function App() {
 
       <div className="layout-panel">
         {showEditor && (
-          <>
-            <div className="layout-header">
+          <div
+            className="layout-dock"
+            style={{ left: dockState.x, top: dockState.y, width: dockState.width }}
+          >
+            <div className="layout-dock__drag-handle" onMouseDown={handleDockDragStart}>
+              <GripVertical size={14} />
+              <span>Layout controls</span>
+            </div>
+            <div className="layout-header layout-dock__handle">
               <div className="layout-select">
                 <label htmlFor="layout-selector">Layout</label>
                 <select
@@ -902,6 +1002,9 @@ function App() {
                 </button>
                 <button type="button" onClick={handleDuplicateLayout}>
                   Duplicate
+                </button>
+                <button type="button" onClick={handleRenameLayout}>
+                  Rename
                 </button>
                 <button type="button" onClick={handleNewLayout}>
                   New
@@ -938,7 +1041,8 @@ function App() {
                 </button>
               ))}
             </div>
-          </>
+            <div className="layout-dock__resize" onMouseDown={handleDockResizeStart} />
+          </div>
         )}
 
         <div

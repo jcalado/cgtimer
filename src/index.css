@@ -132,22 +132,41 @@ div > h1 {
   gap: 12px;
   flex: 1;
   min-height: 0;
+  position: relative;
 }
 
 .layout-header {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
   background: #161821;
   border: 1px solid #222632;
   padding: 10px 12px;
   border-radius: 8px;
 }
 
-.layout-select {
+.layout-header.layout-dock__handle {
+  cursor: move;
+}
+
+.layout-dock__drag-handle {
   display: flex;
   align-items: center;
+  gap: 8px;
+  background: #0f121b;
+  border: 1px solid #222632;
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #cbd4ef;
+  cursor: move;
+  user-select: none;
+}
+
+.layout-select {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
   color: #d7deff;
 }
@@ -164,7 +183,7 @@ div > h1 {
   color: #f2f4ff;
   border: 1px solid #2a2e3b;
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 8px 10px;
 }
 
 .layout-meta {
@@ -173,9 +192,9 @@ div > h1 {
 }
 
 .layout-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 8px;
-  align-items: center;
 }
 
 .layout-actions button,
@@ -209,11 +228,11 @@ div > h1 {
 
 .widget-palette {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   background: #151821;
   border: 1px solid #222632;
-  padding: 10px;
+  padding: 10px 10px 14px;
   border-radius: 8px;
 }
 
@@ -255,6 +274,20 @@ div > h1 {
   background: linear-gradient(90deg, #161a22, #1b2030);
   border-bottom: 1px solid #222632;
 }
+
+.layout-dock {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+  max-height: calc(100% - 16px);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
 
 .widget-card__header-actions {
   display: flex;
@@ -444,4 +477,27 @@ div > h1 {
 .layout-actions button svg,
 .widget-palette button svg {
   margin-right: 2px;
+}
+
+.layout-actions button {
+  justify-content: center;
+  width: 100%;
+}
+.layout-dock__resize {
+  height: 10px;
+  cursor: ew-resize;
+  align-self: stretch;
+  border: 1px solid #242a39;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #161a22, #1b2030);
+}
+
+/* Overrides to make dock draggable/resizable and interactive */
+.layout-dock {
+  pointer-events: auto;
+  right: auto;
+}
+
+.layout-dock > * {
+  pointer-events: auto;
 }

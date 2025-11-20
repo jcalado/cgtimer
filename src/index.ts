@@ -75,7 +75,11 @@ const registerDisplayChangeHandlers = (window: BrowserWindow) => {
 };
 
 const createWindow = (): void => {
-  const osc = new oscListener();
+  const osc = new oscListener((layoutName: string) => {
+    if (mainWindow) {
+      mainWindow.webContents.send("layout:load", layoutName);
+    }
+  });
 
   // Create the browser window.
   mainWindow = new BrowserWindow({

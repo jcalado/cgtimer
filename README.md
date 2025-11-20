@@ -16,6 +16,7 @@ You may use [code@jcalado.com](mailto:code@jcalado.com)
 - Warns about the video being looped, via a "Loop" bug on the elapsed time panel
 - When CasparCG is issued a `STOP` command to the ffmpeg producer, everything is reset
 - 🆕 Connects with ontime for production time management.
+- 🆕 Switch layouts remotely via OSC (`/layout/load` or `/layout/select`)
 
 # Screenshots
 <img src="https://github.com/jcalado/cgtimer/assets/26873/aacae291-62b9-4b0a-be50-683b0851d5e8" width="400px"/>
@@ -44,6 +45,17 @@ You can do this in you caspar.config:
 
 Replace 127.0.0.1 with the IP address of the machine running CGTimer.
 
+### OSC layout switching
+
+You can select a saved layout over OSC. Send a message to either `/layout/load` or `/layout/select` with a single string argument containing the layout name (case-insensitive match).
+
+Example (address + args):
+
+```
+/layout/load "Show A"
+```
+
+If a layout with that name exists, CGTimer will switch to it and exit edit mode.
 
 ## 🆕 ontime integration
 
