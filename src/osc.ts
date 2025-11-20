@@ -1,6 +1,6 @@
 // @ts-ignore
 import osc from "osc";
-import { ElectronPreferences } from "electron-preferences";
+import store from "./store";
 import { Utils } from './utils';
 
 class oscListener {
@@ -12,9 +12,8 @@ class oscListener {
   loop: boolean;
   stopped: boolean;
   udpPort: osc.UDPPort | undefined;
-  preferences: typeof ElectronPreferences;
 
-  constructor(preferences: typeof ElectronPreferences) {
+  constructor() {
     this.currentTime = 0;
     this.remainingTime = 0;
     this.totalTime = 0;
@@ -22,16 +21,18 @@ class oscListener {
     this.loop = false;
     this.stopped = false;
     this.udpPort = undefined;
-    this.preferences = preferences();
 
     this.start();
-    this.preferences.on("save", this.restart);
+
+    // Listen for server port or channel changes
+    store.onDidChange("server.port", this.restart);
+    store.onDidChange("server.channel", this.restart);
   }
 
   public start = () => {
     this.udpPort = new osc.UDPPort({
       localAddress: "0.0.0.0",
-      localPort: this.preferences.value("server.port"),
+      localPort: store.get("server.port"),
       metadata: true,
     });
 
@@ -53,7 +54,7 @@ class oscListener {
   };
 
   private parseCCGMessage = (message: any) => {
-    const channel = this.preferences.value("server.channel");
+    const channel = store.get("server.channel");
     const address = message["address"];
       const args = message["args"];
       const isFromActiveChannel = new RegExp(`/channel/${channel}`).test(

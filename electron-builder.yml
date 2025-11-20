@@ -1,0 +1,32 @@
+appId: com.jcalado.cgtimer
+productName: cgtimer
+copyright: Copyright © 2025 Joel Calado
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**/*
+asarUnpack:
+  - resources/**
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: src/assets/icon.ico
+mac:
+  target:
+    - dmg
+    - zip
+  icon: src/assets/icon.icns
+  category: public.app-category.utilities
+linux:
+  target:
+    - deb
+    - AppImage
+  icon: src/assets/icon.png
+  category: Utility
+publish:
+  provider: github
+  owner: jcalado
+  repo: cgtimer

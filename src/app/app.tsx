@@ -1,5 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Utils } from "../utils";
+import { Minimize2, Maximize2 } from "lucide-react";
 
 function toTime(seconds: number) {
   return new Date(seconds * 1000).toISOString().substr(11, 8);
@@ -30,6 +31,25 @@ function App() {
     runtime: 0,
 
   });
+
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    // Check initial fullscreen state
+    window.api.send("window:get-fullscreen-state");
+
+    // Listen for fullscreen state changes
+    const fullscreenListener = (_: any, fullscreen: boolean) => {
+      setIsFullscreen(fullscreen);
+    };
+
+    window.api.receive("window:fullscreen-state", fullscreenListener);
+
+    return () => {
+      window.api.removeListener("window:fullscreen-state", fullscreenListener);
+    };
+  }, []);
 
   useEffect(() => {
     const displayResetListener = () => {
@@ -119,8 +139,52 @@ function App() {
     }
   }
 
+  const handleToggleFullscreen = () => {
+    window.api.send("window:toggle-fullscreen");
+  };
+
   return (
-    <div className="app">
+    <div
+      className="app"
+      style={{ position: "relative" }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {isHovered && (
+        <button
+          onClick={handleToggleFullscreen}
+          style={{
+            position: "absolute",
+            bottom: "20px",
+            right: "20px",
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            borderRadius: "8px",
+            padding: "12px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.9)";
+            e.currentTarget.style.transform = "scale(1.05)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+          title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+        >
+          {isFullscreen ? (
+            <Minimize2 size={24} color="white" />
+          ) : (
+            <Maximize2 size={24} color="white" />
+          )}
+        </button>
+      )}
       <div className={state.enableProductionClock ? "flexi columns" : "flexi"}>
       <div className="monitor">
         <h1>Clock</h1>
