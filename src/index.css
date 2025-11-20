@@ -112,3 +112,60 @@ div > h1 {
 .flexi {
   flex: 1;
 }
+
+/* Stacked clocks container */
+.clocks-stacked {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+}
+
+/* Main clock (takes 2x space) */
+.clock-main {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.clock-main h1 {
+  font-size: min(3vw, 4vh);
+  margin-bottom: 2vh;
+}
+
+.clock-main > div {
+  font-size: min(15vw, 18vh);
+  font-family: "led";
+  font-weight: bold;
+  text-align: center;
+  width: 100%;
+  line-height: 1;
+}
+
+/* Secondary clock (takes 1x space) */
+.clock-secondary {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.clock-secondary h1 {
+  font-size: min(1.5vw, 2vh);
+  margin-bottom: 1vh;
+}
+
+.clock-secondary > div {
+  font-size: min(7.5vw, 9vh);
+  font-family: "led";
+  font-weight: bold;
+  text-align: center;
+  width: 100%;
+  line-height: 1;
+}

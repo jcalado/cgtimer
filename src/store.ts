@@ -11,6 +11,7 @@ export interface StoreSchema {
   application: {
     display: number;
     fullscreen: boolean;
+    mainClock: "elapsed" | "remaining";
   };
   production: {
     enable: boolean;
@@ -23,6 +24,14 @@ export interface StoreSchema {
     production: string;
     elapsed: string;
     remaining: string;
+  };
+  timezones: {
+    clocks: Array<{
+      id: string;
+      label: string;
+      timezone: string;
+      enabled: boolean;
+    }>;
   };
 }
 
@@ -53,6 +62,11 @@ const schema: Schema<StoreSchema> = {
       fullscreen: {
         type: "boolean",
         default: false,
+      },
+      mainClock: {
+        type: "string",
+        default: "remaining",
+        enum: ["elapsed", "remaining"],
       },
     },
   },
@@ -104,6 +118,25 @@ const schema: Schema<StoreSchema> = {
       },
     },
   },
+  timezones: {
+    type: "object",
+    properties: {
+      clocks: {
+        type: "array",
+        default: [],
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            label: { type: "string" },
+            timezone: { type: "string" },
+            enabled: { type: "boolean" }
+          },
+          required: ["id", "label", "timezone", "enabled"]
+        }
+      }
+    }
+  },
 };
 
 // Default values for the store
@@ -115,6 +148,7 @@ const defaults: StoreSchema = {
   application: {
     display: 0,
     fullscreen: false,
+    mainClock: "remaining",
   },
   production: {
     enable: false,
@@ -127,6 +161,9 @@ const defaults: StoreSchema = {
     production: "#960000",
     elapsed: "#00FF00",
     remaining: "#FF0000",
+  },
+  timezones: {
+    clocks: [],
   },
 };
 

@@ -19,6 +19,7 @@ import { ServerSettings } from "./ServerSettings";
 import { ApplicationSettings } from "./ApplicationSettings";
 import { ProductionSettings } from "./ProductionSettings";
 import { ColorSettings } from "./ColorSettings";
+import { TimezoneSettings } from "./TimezoneSettings";
 import type { StoreSchema } from "../../store";
 
 const useStyles = makeStyles({
@@ -66,7 +67,7 @@ const useStyles = makeStyles({
   },
 });
 
-type TabValue = "server" | "application" | "production" | "colors";
+type TabValue = "server" | "application" | "production" | "colors" | "timezones";
 
 export const PreferencesWindow: React.FC = () => {
   const styles = useStyles();
@@ -81,18 +82,20 @@ export const PreferencesWindow: React.FC = () => {
       // Ensure settings have all required sections with defaults
       setSettings({
         server: loadedSettings?.server || { port: 6251, channel: 1 },
-        application: loadedSettings?.application || { display: 0, fullscreen: false },
+        application: loadedSettings?.application || { display: 0, fullscreen: false, mainClock: "remaining" },
         production: loadedSettings?.production || { enable: false, start: "00:10:00", runtime: "00:20:00", ontime: false },
         colors: loadedSettings?.colors || { clock: "#960000", production: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
+        timezones: loadedSettings?.timezones || { clocks: [] },
       });
     }).catch((error) => {
       console.error("Error loading settings:", error);
       // Set defaults on error
       setSettings({
         server: { port: 6251, channel: 1 },
-        application: { display: 0, fullscreen: false },
+        application: { display: 0, fullscreen: false, mainClock: "remaining" },
         production: { enable: false, start: "00:10:00", runtime: "00:20:00", ontime: false },
         colors: { clock: "#960000", production: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
+        timezones: { clocks: [] },
       });
     });
   }, []);
@@ -169,6 +172,9 @@ export const PreferencesWindow: React.FC = () => {
               <Tab value="colors" icon={<ColorRegular />}>
                 Colors
               </Tab>
+              <Tab value="timezones" icon={<ClockRegular />}>
+                Timezones
+              </Tab>
             </TabList>
           </div>
 
@@ -188,11 +194,15 @@ export const PreferencesWindow: React.FC = () => {
               <ApplicationSettings
                 display={settings.application.display}
                 fullscreen={settings.application.fullscreen}
+                mainClock={settings.application.mainClock}
                 onDisplayChange={(value) =>
                   updateSetting("application", "display", value)
                 }
                 onFullscreenChange={(value) =>
                   updateSetting("application", "fullscreen", value)
+                }
+                onMainClockChange={(value) =>
+                  updateSetting("application", "mainClock", value)
                 }
               />
             )}
@@ -236,6 +246,13 @@ export const PreferencesWindow: React.FC = () => {
                 onRemainingChange={(value) =>
                   updateSetting("colors", "remaining", value)
                 }
+              />
+            )}
+
+            {selectedTab === "timezones" && (
+              <TimezoneSettings
+                clocks={settings.timezones.clocks}
+                onChange={(clocks) => updateSetting("timezones", "clocks", clocks)}
               />
             )}
           </div>

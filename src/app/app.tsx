@@ -13,6 +13,37 @@ function clockTime() {
   return timeZoneDate.toISOString().substr(11, 8);
 }
 
+function getTimezoneTime(timezone: string): string {
+  try {
+    const date = new Date();
+    const timeString = date.toLocaleString("en-US", {
+      timeZone: timezone,
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const parts = timeString.split(", ");
+    return parts.length > 1 ? parts[1] : timeString;
+  } catch (error) {
+    return "00:00:00";
+  }
+}
+
+function getTimezoneOffset(timezone: string): string {
+  try {
+    const now = new Date();
+    const localDate = new Date();
+    const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+    const offsetMinutes = (tzDate.getTime() - localDate.getTime()) / 60000;
+    const hours = Math.floor(Math.abs(offsetMinutes) / 60);
+    const sign = offsetMinutes >= 0 ? '+' : '-';
+    return `${sign}${hours}h`;
+  } catch {
+    return '';
+  }
+}
+
 function App() {
   const [state, setState] = React.useState({
     currentTime: 0,
@@ -29,11 +60,18 @@ function App() {
     productionColor: "",
     startTime: 0,
     runtime: 0,
-
+    timezoneClocks: [] as Array<{
+      id: string;
+      label: string;
+      timezone: string;
+      enabled: boolean;
+    }>,
+    mainClock: "remaining" as "elapsed" | "remaining",
   });
 
   const [isHovered, setIsHovered] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentClockIndex, setCurrentClockIndex] = useState(-1); // -1 = local time, 0+ = timezone index
 
   useEffect(() => {
     // Check initial fullscreen state
@@ -68,6 +106,8 @@ function App() {
         remainingColor: "",
         clockColor: "",
         productionColor: "",
+        timezoneClocks: [],
+        mainClock: "remaining",
       });
     }
 
@@ -87,6 +127,42 @@ function App() {
       window.api.removeListener('timers:update', timersListener);
     }
   }, []);
+
+  // Create a stable key that only changes when enabled clocks actually change
+  const enabledClocksKey = React.useMemo(() => {
+    return state.timezoneClocks
+      .filter(clock => clock.enabled)
+      .map(clock => clock.id)
+      .join(',');
+  }, [state.timezoneClocks]);
+
+  // Rotate through timezone clocks every 10 seconds
+  useEffect(() => {
+    const enabledClocks = state.timezoneClocks.filter(clock => clock.enabled);
+
+    // If no timezone clocks are enabled, stay on local time
+    if (enabledClocks.length === 0) {
+      setCurrentClockIndex(-1);
+      return;
+    }
+
+    // Start rotation immediately
+    setCurrentClockIndex(-1);
+
+    const interval = setInterval(() => {
+      setCurrentClockIndex(prevIndex => {
+        const enabledClocks = state.timezoneClocks.filter(clock => clock.enabled);
+        const nextIndex = prevIndex + 1;
+        // If we've gone through all timezone clocks, go back to local time
+        if (nextIndex >= enabledClocks.length) {
+          return -1;
+        }
+        return nextIndex;
+      });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [enabledClocksKey]);
 
   // Status enum
   const Status = {
@@ -139,6 +215,31 @@ function App() {
     }
   }
 
+  const getCurrentClockLabel = () => {
+    const enabledClocks = state.timezoneClocks.filter(clock => clock.enabled);
+
+    if (currentClockIndex === -1 || enabledClocks.length === 0) {
+      return "Clock";
+    }
+
+    const currentClock = enabledClocks[currentClockIndex];
+    if (!currentClock) return "Clock";
+
+    const offset = getTimezoneOffset(currentClock.timezone);
+    return `${currentClock.label} (${offset})`;
+  }
+
+  const getCurrentClockTime = () => {
+    const enabledClocks = state.timezoneClocks.filter(clock => clock.enabled);
+
+    if (currentClockIndex === -1 || enabledClocks.length === 0) {
+      return clockTime();
+    }
+
+    const currentClock = enabledClocks[currentClockIndex];
+    return currentClock ? getTimezoneTime(currentClock.timezone) : clockTime();
+  }
+
   const handleToggleFullscreen = () => {
     window.api.send("window:toggle-fullscreen");
   };
@@ -187,9 +288,9 @@ function App() {
       )}
       <div className={state.enableProductionClock ? "flexi columns" : "flexi"}>
       <div className="monitor">
-        <h1>Clock</h1>
-        <div id="time " style={{color: state.clockColor}}>{clockTime()}</div>
-        
+        <h1>{getCurrentClockLabel()}</h1>
+        <div id="time " style={{color: state.clockColor}}>{getCurrentClockTime()}</div>
+
       </div>
       {state.enableProductionClock ? (
               <div className="monitor">
@@ -200,14 +301,24 @@ function App() {
 
       </div>
       
-      <div className="monitor">
+      <div className="monitor clocks-stacked">
         <h2 id="loop">{state.loop ? "LOOP" : null}</h2>
-        <h1>Elapsed</h1>
-        <div id="currentTime" style={{color: state.elapsedColor}}>{toTime(state.currentTime)}</div>
-      </div>
-      <div className={remainingClassName()}>
-        <h1>Remaining</h1>
-        <div id="remainingTime" style={{color: remainingTimeColor()}}>{toTime(state.remainingTime)}</div>
+
+        {/* Main clock (2x size) */}
+        <div className="clock-main">
+          <h1>{state.mainClock === "elapsed" ? "Elapsed" : "Remaining"}</h1>
+          <div style={{color: state.mainClock === "elapsed" ? state.elapsedColor : remainingTimeColor()}}>
+            {state.mainClock === "elapsed" ? toTime(state.currentTime) : toTime(state.remainingTime)}
+          </div>
+        </div>
+
+        {/* Secondary clock (1x size) */}
+        <div className="clock-secondary">
+          <h1>{state.mainClock === "elapsed" ? "Remaining" : "Elapsed"}</h1>
+          <div style={{color: state.mainClock === "elapsed" ? remainingTimeColor() : state.elapsedColor}}>
+            {state.mainClock === "elapsed" ? toTime(state.remainingTime) : toTime(state.currentTime)}
+          </div>
+        </div>
       </div>
     </div>
   );

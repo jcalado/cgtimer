@@ -28,15 +28,19 @@ interface Display {
 interface ApplicationSettingsProps {
   display: number;
   fullscreen: boolean;
+  mainClock: "elapsed" | "remaining";
   onDisplayChange: (value: number) => void;
   onFullscreenChange: (value: boolean) => void;
+  onMainClockChange: (value: "elapsed" | "remaining") => void;
 }
 
 export const ApplicationSettings: React.FC<ApplicationSettingsProps> = ({
   display,
   fullscreen,
+  mainClock,
   onDisplayChange,
   onFullscreenChange,
+  onMainClockChange,
 }) => {
   const styles = useStyles();
   const [displays, setDisplays] = useState<Display[]>([]);
@@ -80,6 +84,28 @@ export const ApplicationSettings: React.FC<ApplicationSettingsProps> = ({
           checked={fullscreen}
           onChange={(_, data) => onFullscreenChange(data.checked)}
         />
+      </Field>
+
+      <Field
+        label="Main Clock"
+        hint="Select which clock should be displayed larger (2x size)"
+        className={styles.field}
+      >
+        <Dropdown
+          value={mainClock === "elapsed" ? "Elapsed" : "Remaining"}
+          selectedOptions={[mainClock]}
+          onOptionSelect={(_, data) => {
+            const value = data.optionValue as "elapsed" | "remaining";
+            onMainClockChange(value);
+          }}
+        >
+          <Option key="elapsed" value="elapsed">
+            Elapsed
+          </Option>
+          <Option key="remaining" value="remaining">
+            Remaining
+          </Option>
+        </Dropdown>
       </Field>
     </div>
   );

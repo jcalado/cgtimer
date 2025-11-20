@@ -190,6 +190,8 @@ const createWindow = (): void => {
         store.get("production.start"),
         store.get("production.runtime")
       ),
+      timezoneClocks: store.get("timezones.clocks") || [],
+      mainClock: store.get("application.mainClock"),
     });
   }, 200);
 };
@@ -231,6 +233,7 @@ ipcMain.handle("settings:get", (): StoreSchema => {
     application: store.get("application"),
     production: store.get("production"),
     colors: store.get("colors"),
+    timezones: store.get("timezones"),
   };
 });
 
@@ -240,6 +243,7 @@ ipcMain.handle("settings:save", (_, settings: StoreSchema) => {
   store.set("application", settings.application);
   store.set("production", settings.production);
   store.set("colors", settings.colors);
+  store.set("timezones", settings.timezones);
 
   // Notify main window of changes
   mainWindow?.webContents.send("settings:changed", settings);
@@ -252,6 +256,7 @@ ipcMain.handle("settings:reset", (): StoreSchema => {
     application: store.get("application"),
     production: store.get("production"),
     colors: store.get("colors"),
+    timezones: store.get("timezones"),
   };
 });
 
