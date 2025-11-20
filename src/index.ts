@@ -145,6 +145,13 @@ const createWindow = (): void => {
       label: "File",
       submenu: [
         {
+          label: "Edit Layout",
+          accelerator: "CmdOrCtrl+E",
+          click: () => {
+            mainWindow?.webContents.send("layout:edit");
+          },
+        },
+        {
           label: "Preferences",
           click: () => {
             appSettings.show();

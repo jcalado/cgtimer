@@ -1,7 +1,5 @@
-// @ts-ignore
-import osc from "osc";
+import osc, { OSCMessage, UDPPort } from "osc";
 import store from "./store";
-import { Utils } from './utils';
 
 class oscListener {
   port: number;
@@ -11,7 +9,7 @@ class oscListener {
   ontimeCurrent: number;
   loop: boolean;
   stopped: boolean;
-  udpPort: osc.UDPPort | undefined;
+  udpPort: UDPPort | undefined;
 
   constructor() {
     this.currentTime = 0;
@@ -38,7 +36,7 @@ class oscListener {
 
     
 
-    this.udpPort.on("message", (message: any, timetag: any, info: any) => {
+    this.udpPort.on("message", (message: OSCMessage) => {
       // If the message startes with /channel/ then it is a CCG message
       if (message["address"].startsWith("/channel/")) {
         this.parseCCGMessage(message);
@@ -53,7 +51,7 @@ class oscListener {
     this.udpPort.open();
   };
 
-  private parseCCGMessage = (message: any) => {
+  private parseCCGMessage = (message: OSCMessage) => {
     const channel = store.get("server.channel");
     const address = message["address"];
       const args = message["args"];
@@ -83,7 +81,7 @@ class oscListener {
       }
   }
 
-  private parseOntimeMessage = (message: any) => {
+  private parseOntimeMessage = (message: OSCMessage) => {
     const args = message["args"];
 
     if (message["address"].startsWith("/from-ontime/current")) {
