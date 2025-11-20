@@ -82,7 +82,7 @@ export const PreferencesWindow: React.FC = () => {
       // Ensure settings have all required sections with defaults
       setSettings({
         server: loadedSettings?.server || { port: 6251, channel: 1 },
-        application: loadedSettings?.application || { display: 0, fullscreen: false, mainClock: "remaining" },
+        application: loadedSettings?.application || { display: 0, fullscreen: false },
         production: loadedSettings?.production || { enable: false, start: "00:10:00", runtime: "00:20:00", ontime: false },
         colors: loadedSettings?.colors || { clock: "#960000", production: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
         timezones: loadedSettings?.timezones || { clocks: [] },
@@ -92,7 +92,7 @@ export const PreferencesWindow: React.FC = () => {
       // Set defaults on error
       setSettings({
         server: { port: 6251, channel: 1 },
-        application: { display: 0, fullscreen: false, mainClock: "remaining" },
+        application: { display: 0, fullscreen: false },
         production: { enable: false, start: "00:10:00", runtime: "00:20:00", ontime: false },
         colors: { clock: "#960000", production: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
         timezones: { clocks: [] },
@@ -194,15 +194,11 @@ export const PreferencesWindow: React.FC = () => {
               <ApplicationSettings
                 display={settings.application.display}
                 fullscreen={settings.application.fullscreen}
-                mainClock={settings.application.mainClock}
                 onDisplayChange={(value) =>
                   updateSetting("application", "display", value)
                 }
                 onFullscreenChange={(value) =>
                   updateSetting("application", "fullscreen", value)
-                }
-                onMainClockChange={(value) =>
-                  updateSetting("application", "mainClock", value)
                 }
               />
             )}

@@ -224,14 +224,14 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
   primaryTimer: {
     key: "primaryTimer",
     label: "Remaining Timer",
-    description: "Shows the configured main clock (elapsed or remaining)",
+    description: "Shows remaining time",
     defaultSize: { w: 3, h: 3 },
     minSize: { w: 3, h: 3 },
   },
   secondaryTimer: {
     key: "secondaryTimer",
     label: "Elapsed Timer",
-    description: "Shows the opposite clock to the main clock",
+    description: "Shows elapsed time",
     defaultSize: { w: 3, h: 3 },
     minSize: { w: 3, h: 3 },
   },
@@ -359,7 +359,6 @@ function App() {
       timezone: string;
       enabled: boolean;
     }>,
-    mainClock: "remaining" as "elapsed" | "remaining",
   });
   const [isHovered, setIsHovered] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -411,7 +410,6 @@ function App() {
         clockColor: "",
         productionColor: "",
         timezoneClocks: [],
-        mainClock: "remaining",
       });
     };
 
@@ -800,16 +798,9 @@ function App() {
     if (widget.key === "primaryTimer") {
       return (
         <TimerMonitor
-          title={state.mainClock === "elapsed" ? "Elapsed" : "Remaining"}
-          value={
-            state.mainClock === "elapsed"
-              ? toTime(state.currentTime)
-              : toTime(state.remainingTime)
-          }
-          color={
-            colors.faceColor ??
-            (state.mainClock === "elapsed" ? state.elapsedColor : remainingTimeColor())
-          }
+          title="Remaining"
+          value={toTime(state.remainingTime)}
+          color={colors.faceColor ?? remainingTimeColor()}
           labelColor={colors.labelColor}
           backgroundColor={colors.backgroundColor}
           className="clocks-stacked"
@@ -820,16 +811,9 @@ function App() {
     if (widget.key === "secondaryTimer") {
       return (
         <TimerMonitor
-          title={state.mainClock === "elapsed" ? "Remaining" : "Elapsed"}
-          value={
-            state.mainClock === "elapsed"
-              ? toTime(state.remainingTime)
-              : toTime(state.currentTime)
-          }
-          color={
-            colors.faceColor ??
-            (state.mainClock === "elapsed" ? remainingTimeColor() : state.elapsedColor)
-          }
+          title="Elapsed"
+          value={toTime(state.currentTime)}
+          color={colors.faceColor ?? state.elapsedColor}
           labelColor={colors.labelColor}
           backgroundColor={colors.backgroundColor}
           className="clocks-stacked"

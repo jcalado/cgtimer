@@ -11,7 +11,6 @@ export interface StoreSchema {
   application: {
     display: number;
     fullscreen: boolean;
-    mainClock: "elapsed" | "remaining";
   };
   production: {
     enable: boolean;
@@ -62,11 +61,6 @@ const schema: Schema<StoreSchema> = {
       fullscreen: {
         type: "boolean",
         default: false,
-      },
-      mainClock: {
-        type: "string",
-        default: "remaining",
-        enum: ["elapsed", "remaining"],
       },
     },
   },
@@ -148,7 +142,6 @@ const defaults: StoreSchema = {
   application: {
     display: 0,
     fullscreen: false,
-    mainClock: "remaining",
   },
   production: {
     enable: false,

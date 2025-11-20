@@ -198,7 +198,6 @@ const createWindow = (): void => {
         store.get("production.runtime")
       ),
       timezoneClocks: store.get("timezones.clocks") || [],
-      mainClock: store.get("application.mainClock"),
     });
   }, 200);
 };
