@@ -21,6 +21,7 @@ const isDebug = process.env.NODE_ENV === "development";
 const appSettings = new settings();
 let mainWindow: BrowserWindow | null = null;
 let timer: NodeJS.Timeout;
+let layoutShortcuts: string[] = [];
 
 const getDisplayOrigin = (display: Display) => {
   if (display.bounds) {
@@ -75,11 +76,20 @@ const registerDisplayChangeHandlers = (window: BrowserWindow) => {
 };
 
 const createWindow = (): void => {
-  const osc = new oscListener((layoutName: string) => {
-    if (mainWindow) {
-      mainWindow.webContents.send("layout:load", layoutName);
+  const osc = new oscListener(
+    // Layout load callback
+    (layoutName: string) => {
+      if (mainWindow) {
+        mainWindow.webContents.send("layout:load", layoutName);
+      }
+    },
+    // Timer command callback
+    (name: string, action: string, value?: number) => {
+      if (mainWindow) {
+        mainWindow.webContents.send("osc-timer:command", { name, action, value });
+      }
     }
-  });
+  );
 
   // Create the browser window.
   mainWindow = new BrowserWindow({
@@ -144,43 +154,55 @@ const createWindow = (): void => {
     mainWindow.webContents.openDevTools();
   }
 
-  const menu = Menu.buildFromTemplate([
-    {
-      label: "File",
-      submenu: [
-        {
-          label: "Edit Layout",
-          accelerator: "CmdOrCtrl+E",
-          click: () => {
-            mainWindow?.webContents.send("layout:edit");
+  const buildMenu = () =>
+    Menu.buildFromTemplate([
+      {
+        label: "File",
+        submenu: [
+          {
+            label: "Edit Layout",
+            accelerator: "CmdOrCtrl+E",
+            click: () => {
+              mainWindow?.webContents.send("layout:edit");
+            },
           },
-        },
-        {
-          label: "Preferences",
-          click: () => {
-            appSettings.show();
+          {
+            label: "Preferences",
+            click: () => {
+              appSettings.show();
+            },
           },
-        },
-        isMac ? { role: "close" } : { role: "quit" },
-      ],
-    },
-    {
-      label: "View",
-      submenu: [
-        { role: "reload" },
-        { role: "forceReload" },
-        { role: "toggleDevTools" },
-        { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-        { type: "separator" },
-        { role: "togglefullscreen" },
-      ],
-    },
-  ]);
+          isMac ? { role: "close" } : { role: "quit" },
+        ],
+      },
+      {
+        label: "Layouts",
+        submenu:
+          layoutShortcuts.length > 0
+            ? layoutShortcuts.slice(0, 9).map((label, index) => ({
+                label: `${index + 1}. ${label}`,
+                accelerator: `CmdOrCtrl+${index + 1}`,
+                click: () => mainWindow?.webContents.send("layout:load", label),
+              }))
+            : [{ label: "No layouts yet", enabled: false }],
+      },
+      {
+        label: "View",
+        submenu: [
+          { role: "reload" },
+          { role: "forceReload" },
+          { role: "toggleDevTools" },
+          { type: "separator" },
+          { role: "resetZoom" },
+          { role: "zoomIn" },
+          { role: "zoomOut" },
+          { type: "separator" },
+          { role: "togglefullscreen" },
+        ],
+      },
+    ]);
 
-  Menu.setApplicationMenu(menu);
+  Menu.setApplicationMenu(buildMenu());
 
   timer = setInterval(() => {
     mainWindow?.webContents.send("timers:update", {
@@ -272,6 +294,58 @@ ipcMain.handle("settings:reset", (): StoreSchema => {
 
 ipcMain.handle("displays:get", () => {
   return getDisplays();
+});
+
+ipcMain.on("layouts:update", (_event, layoutNames: string[]) => {
+  layoutShortcuts = layoutNames;
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "File",
+        submenu: [
+          {
+            label: "Edit Layout",
+            accelerator: "CmdOrCtrl+E",
+            click: () => {
+              mainWindow?.webContents.send("layout:edit");
+            },
+          },
+          {
+            label: "Preferences",
+            click: () => {
+              appSettings.show();
+            },
+          },
+          isMac ? { role: "close" } : { role: "quit" },
+        ],
+      },
+      {
+        label: "Layouts",
+        submenu:
+          layoutShortcuts.length > 0
+            ? layoutShortcuts.slice(0, 9).map((label, index) => ({
+                label: `${index + 1}. ${label}`,
+                accelerator: `CmdOrCtrl+${index + 1}`,
+                click: () => mainWindow?.webContents.send("layout:load", label),
+              }))
+            : [{ label: "No layouts yet", enabled: false }],
+      },
+      {
+        label: "View",
+        submenu: [
+          { role: "reload" },
+          { role: "forceReload" },
+          { role: "toggleDevTools" },
+          { type: "separator" },
+          { role: "resetZoom" },
+          { role: "zoomIn" },
+          { role: "zoomOut" },
+          { type: "separator" },
+          { role: "togglefullscreen" },
+        ],
+      },
+    ])
+  );
 });
 
 // Check for updates using electron-updater

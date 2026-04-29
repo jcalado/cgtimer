@@ -21,7 +21,8 @@ type WidgetKind =
   | "primaryTimer"
   | "secondaryTimer"
   | "productionTimer"
-  | "loopState";
+  | "loopState"
+  | "oscTimer";
 
 type WidgetDefinition = {
   key: WidgetKind;
@@ -38,7 +39,15 @@ type WidgetLayoutItem = Layout & {
     labelColor?: string;
     faceColor?: string;
     backgroundColor?: string;
+    showLabel?: boolean;
+    customLabel?: string;
+    oscTimerName?: string;
   };
+};
+
+type OscTimerState = {
+  startedAt: number | null;
+  elapsed: number;
 };
 
 type SavedLayout = {
@@ -56,6 +65,66 @@ type TimerMonitorProps = {
   backgroundColor?: string;
   className?: string;
   faceClassName?: string;
+  showLabel?: boolean;
+};
+
+type PromptDialogProps = {
+  open: boolean;
+  title: string;
+  message?: string;
+  value: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+};
+
+const PromptDialog = ({
+  open,
+  title,
+  message,
+  value,
+  confirmLabel = "OK",
+  cancelLabel = "Cancel",
+  onChange,
+  onSubmit,
+  onCancel,
+}: PromptDialogProps) => {
+  if (!open) return null;
+  return (
+    <div className="prompt-overlay" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="prompt-modal">
+        <div className="prompt-modal__header">
+          <div className="prompt-modal__title">{title}</div>
+          {message ? <div className="prompt-modal__subtitle">{message}</div> : null}
+        </div>
+        <form
+          className="prompt-modal__body"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit();
+          }}
+        >
+          <input
+            autoFocus
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="prompt-modal__input"
+          />
+          <div className="prompt-modal__actions">
+            <button type="button" onClick={onCancel}>
+              {cancelLabel}
+            </button>
+            <button type="submit" className="primary">
+              {confirmLabel}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 const TimerMonitor = ({
@@ -66,6 +135,7 @@ const TimerMonitor = ({
   backgroundColor,
   className = "",
   faceClassName = "",
+  showLabel = true,
 }: TimerMonitorProps) => {
   const containerClass = ["monitor", className].filter(Boolean).join(" ");
   const faceClass = ["clock-face", faceClassName].filter(Boolean).join(" ");
@@ -74,7 +144,9 @@ const TimerMonitor = ({
       className={containerClass}
       style={backgroundColor ? { backgroundColor } : undefined}
     >
-      <h1 style={labelColor ? { color: labelColor } : undefined}>{title}</h1>
+      {showLabel && (
+        <h1 style={labelColor ? { color: labelColor } : undefined}>{title}</h1>
+      )}
       <div className={faceClass} style={{ color }}>{value}</div>
     </div>
   );
@@ -96,6 +168,9 @@ type ColorConfigPanelProps = {
 
 const ColorConfigPanel = ({ item, onChange, onClose }: ColorConfigPanelProps) => {
   const colors = getWidgetColors(item.settings);
+  const showLabel = item.settings?.showLabel !== false;
+  const customLabel = item.settings?.customLabel ?? "";
+
   const handleChange =
     (key: "labelColor" | "faceColor" | "backgroundColor") =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,33 +178,62 @@ const ColorConfigPanel = ({ item, onChange, onClose }: ColorConfigPanelProps) =>
       onChange({ [key]: value || undefined });
     };
 
+  const handleShowLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange({ showLabel: e.target.checked });
+  };
+
+  const handleCustomLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange({ customLabel: e.target.value || undefined });
+  };
+
   const handleReset = () => {
     onChange({
       labelColor: undefined,
       faceColor: undefined,
       backgroundColor: undefined,
+      showLabel: true,
+      customLabel: undefined,
     });
   };
 
   return (
-    <div className="widget-config-overlay" role="dialog" aria-label="Widget color settings">
+    <div className="widget-config-overlay" role="dialog" aria-label="Widget settings">
       <div className="widget-config">
         <div className="widget-config__header">
           <div>
-            <div className="widget-config__title">Colors</div>
-            <div className="widget-config__subtitle">Customize label, face, and background</div>
+            <div className="widget-config__title">Widget Settings</div>
+            <div className="widget-config__subtitle">Customize appearance</div>
           </div>
-          <button type="button" className="quiet" onClick={onClose} aria-label="Close color settings">
+          <button type="button" className="quiet" onClick={onClose} aria-label="Close settings">
             x
           </button>
         </div>
         <div className="widget-config__body">
           <label className="widget-config__row">
-            <span>Label</span>
+            <span>Show Label</span>
+            <input
+              type="checkbox"
+              checked={showLabel}
+              onChange={handleShowLabelChange}
+            />
+          </label>
+          <label className="widget-config__row">
+            <span>Custom Label</span>
+            <input
+              type="text"
+              value={customLabel}
+              onChange={handleCustomLabelChange}
+              placeholder="Default"
+              disabled={!showLabel}
+            />
+          </label>
+          <label className="widget-config__row">
+            <span>Label Color</span>
             <input
               type="color"
               value={colors.labelColor ?? "#aaaaaa"}
               onChange={handleChange("labelColor")}
+              disabled={!showLabel}
             />
           </label>
           <label className="widget-config__row">
@@ -250,6 +354,13 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     defaultSize: { w: 2, h: 2 },
     minSize: { w: 2, h: 2 },
   },
+  oscTimer: {
+    key: "oscTimer",
+    label: "OSC Timer",
+    description: "Stopwatch triggered via OSC commands",
+    defaultSize: { w: 3, h: 3 },
+    minSize: { w: 3, h: 3 },
+  },
 };
 
 const generateId = () =>
@@ -363,17 +474,27 @@ function App() {
   });
   const [isHovered, setIsHovered] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [oscTimers, setOscTimers] = useState<Record<string, OscTimerState>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = window.localStorage.getItem("cgtimer.oscTimers");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [currentTick, setCurrentTick] = useState(Date.now());
   const [layouts, setLayouts] = useState<SavedLayout[]>(initialLayouts);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string>(
     initialLayouts[0]?.id ?? ""
   );
   const [draftItems, setDraftItems] = useState<WidgetLayoutItem[]>(
-    initialLayouts[0]?.items ?? []
+    () => (initialLayouts[0]?.items ?? []).map((item) => ({ ...item }))
   );
   const layoutsRef = useRef<SavedLayout[]>(initialLayouts);
   const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null);
-  const [mode, setMode] = useState<"edit" | "preview">("edit");
-  const [showEditor, setShowEditor] = useState(true);
+  const [mode, setMode] = useState<"edit" | "preview">("preview");
+  const [showEditor, setShowEditor] = useState(false);
   const [gridWidth, setGridWidth] = useState<number>(
     typeof window !== "undefined" ? window.innerWidth - 32 : 1200
   );
@@ -388,6 +509,8 @@ function App() {
   const dockResizeRef = useRef<{ startWidth: number; startX: number } | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const dragOriginRef = useRef<WidgetLayoutItem[] | null>(null);
+  const [renameTargetId, setRenameTargetId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
     window.api.send("window:get-fullscreen-state");
@@ -500,7 +623,8 @@ function App() {
 
   useEffect(() => {
     if (selectedLayout) {
-      setDraftItems(selectedLayout.items);
+      // Deep copy to avoid reference issues with react-grid-layout
+      setDraftItems(selectedLayout.items.map((item) => ({ ...item })));
     }
   }, [selectedLayout]);
 
@@ -508,6 +632,12 @@ function App() {
     layoutsRef.current = layouts;
     if (!layouts.length) return;
     persistLayouts(layouts);
+    if (typeof window !== "undefined" && window.api?.send) {
+      window.api.send(
+        "layouts:update",
+        layouts.map((layout) => layout.name)
+      );
+    }
   }, [layouts]);
 
   useEffect(() => {
@@ -577,7 +707,8 @@ function App() {
       );
       if (!target) return;
       setSelectedLayoutId(target.id);
-      setDraftItems(target.items);
+      // Deep copy items to avoid reference issues with react-grid-layout
+      setDraftItems(target.items.map((item) => ({ ...item })));
       setMode("preview");
       setShowEditor(false);
     };
@@ -585,6 +716,72 @@ function App() {
     window.api.receive("layout:load", handleLayoutLoad);
     return () => {
       window.api.removeListener("layout:load", handleLayoutLoad);
+    };
+  }, []);
+
+  // OSC Timer: tick update for running timers
+  useEffect(() => {
+    const hasRunningTimer = Object.values(oscTimers).some((t) => t.startedAt !== null);
+    if (!hasRunningTimer) return;
+
+    const interval = setInterval(() => setCurrentTick(Date.now()), 100);
+    return () => clearInterval(interval);
+  }, [oscTimers]);
+
+  // OSC Timer: persist state
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("cgtimer.oscTimers", JSON.stringify(oscTimers));
+  }, [oscTimers]);
+
+  // OSC Timer: listen for commands
+  useEffect(() => {
+    const handleTimerCommand = (
+      _event: unknown,
+      { name, action, value }: { name: string; action: string; value?: number }
+    ) => {
+      setOscTimers((prev) => {
+        const timer = prev[name] || { startedAt: null, elapsed: 0 };
+        const now = Date.now();
+
+        switch (action) {
+          case "start":
+            if (timer.startedAt) return prev;
+            return { ...prev, [name]: { ...timer, startedAt: now } };
+          case "stop":
+            if (!timer.startedAt) return prev;
+            return {
+              ...prev,
+              [name]: {
+                startedAt: null,
+                elapsed: timer.elapsed + (now - timer.startedAt),
+              },
+            };
+          case "reset":
+            return { ...prev, [name]: { startedAt: null, elapsed: 0 } };
+          case "toggle":
+            if (timer.startedAt) {
+              return {
+                ...prev,
+                [name]: {
+                  startedAt: null,
+                  elapsed: timer.elapsed + (now - timer.startedAt),
+                },
+              };
+            } else {
+              return { ...prev, [name]: { ...timer, startedAt: now } };
+            }
+          case "set":
+            return { ...prev, [name]: { startedAt: null, elapsed: value ?? 0 } };
+          default:
+            return prev;
+        }
+      });
+    };
+
+    window.api.receive("osc-timer:command", handleTimerCommand);
+    return () => {
+      window.api.removeListener("osc-timer:command", handleTimerCommand);
     };
   }, []);
 
@@ -644,6 +841,17 @@ function App() {
     const defaultTimezoneId =
       state.timezoneClocks.find((tz) => tz.enabled)?.id ||
       state.timezoneClocks[0]?.id;
+
+    const getDefaultSettings = (): WidgetLayoutItem["settings"] => {
+      if (widgetKey === "worldClock") {
+        return { timezoneId: defaultTimezoneId };
+      }
+      if (widgetKey === "oscTimer") {
+        return { oscTimerName: `timer${generateId().slice(0, 4)}` };
+      }
+      return {};
+    };
+
     const newItem: WidgetLayoutItem = {
       i: generateId(),
       x: 0,
@@ -653,12 +861,7 @@ function App() {
       minW: definition.minSize?.w,
       minH: definition.minSize?.h,
       widgetKey,
-      settings:
-        widgetKey === "worldClock"
-          ? {
-              timezoneId: defaultTimezoneId,
-            }
-          : {},
+      settings: getDefaultSettings(),
     };
     setDraftItems((prev) => [...prev, newItem]);
   };
@@ -745,17 +948,28 @@ function App() {
   };
 
   const handleRenameLayout = () => {
-    if (!selectedLayout) return;
-    const name = prompt("New name for layout?", selectedLayout.name);
-    if (!name) return;
-    const trimmed = name.trim();
+    if (!selectedLayoutId) return;
+    const current = layoutsRef.current.find((layout) => layout.id === selectedLayoutId);
+    setRenameTargetId(selectedLayoutId);
+    setRenameValue(current?.name ?? "");
+  };
+
+  const handleRenameSubmit = () => {
+    if (!renameTargetId) return;
+    const trimmed = renameValue.trim();
     if (!trimmed) return;
-    const updated = layouts.map((layout) =>
-      layout.id === selectedLayout.id
-        ? { ...layout, name: trimmed, updatedAt: Date.now() }
-        : layout
+    setLayouts((prev) =>
+      prev.map((layout) =>
+        layout.id === renameTargetId
+          ? { ...layout, name: trimmed, updatedAt: Date.now() }
+          : layout
+      )
     );
-    setLayouts(updated);
+    setRenameTargetId(null);
+  };
+
+  const handleRenameCancel = () => {
+    setRenameTargetId(null);
   };
 
   const handleDeleteLayout = () => {
@@ -769,6 +983,8 @@ function App() {
   const renderWidget = (item: WidgetLayoutItem, isEditing: boolean) => {
     const widget = widgetCatalog[item.widgetKey];
     const colors = getWidgetColors(item.settings);
+    const showLabel = item.settings?.showLabel !== false;
+    const customLabel = item.settings?.customLabel;
     if (!widget) {
       return <div>Unknown widget</div>;
     }
@@ -778,7 +994,7 @@ function App() {
       const selectedTimezone =
         timezones.find((tz) => tz.id === item.settings?.timezoneId) ||
         timezones[0];
-      const label = selectedTimezone
+      const defaultLabel = selectedTimezone
         ? `${selectedTimezone.label} (${getTimezoneOffset(selectedTimezone.timezone)})`
         : "Configure a timezone";
       const time = selectedTimezone
@@ -812,9 +1028,11 @@ function App() {
               </select>
             </div>
           )}
-          <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-            {label}
-          </h1>
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || defaultLabel}
+            </h1>
+          )}
           <div
             className="clock-face"
             style={{ color: colors.faceColor ?? state.clockColor }}
@@ -833,9 +1051,11 @@ function App() {
             colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
           }
         >
-          <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-            Local Clock
-          </h1>
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || "Local Clock"}
+            </h1>
+          )}
           <div
             className="clock-face"
             style={{ color: colors.faceColor ?? state.clockColor }}
@@ -849,7 +1069,7 @@ function App() {
     if (widget.key === "productionTimer") {
       return (
         <TimerMonitor
-          title="Production"
+          title={customLabel || "Production"}
           value={
             state.enableProductionClock
               ? state.enableOntime
@@ -861,13 +1081,14 @@ function App() {
           labelColor={colors.labelColor}
           backgroundColor={colors.backgroundColor}
           className="small"
+          showLabel={showLabel}
         />
       );
     }
 
     if (widget.key === "loopState") {
       const loopColor = state.loop ? "lime" : "#888";
-      const loopLabel = state.loop ? "Loop enabled" : "Loop disabled";
+      const loopAriaLabel = state.loop ? "Loop enabled" : "Loop disabled";
       return (
         <div
           className="monitor small"
@@ -875,12 +1096,16 @@ function App() {
             colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
           }
         >
-          <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>Loop</h1>
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || "Loop"}
+            </h1>
+          )}
           <div
             className="clock-face"
             style={{ color: colors.faceColor ?? loopColor }}
-            aria-label={loopLabel}
-            title={loopLabel}
+            aria-label={loopAriaLabel}
+            title={loopAriaLabel}
           >
             {state.loop ? <Repeat size={56} strokeWidth={2.5} /> : <Ban size={56} />}
           </div>
@@ -891,12 +1116,13 @@ function App() {
     if (widget.key === "primaryTimer") {
       return (
         <TimerMonitor
-          title="Remaining"
+          title={customLabel || "Remaining"}
           value={toTime(state.remainingTime)}
           color={colors.faceColor ?? remainingTimeColor()}
           labelColor={colors.labelColor}
           backgroundColor={colors.backgroundColor}
           className="clocks-stacked"
+          showLabel={showLabel}
         />
       );
     }
@@ -904,13 +1130,60 @@ function App() {
     if (widget.key === "secondaryTimer") {
       return (
         <TimerMonitor
-          title="Elapsed"
+          title={customLabel || "Elapsed"}
           value={toTime(state.currentTime)}
           color={colors.faceColor ?? state.elapsedColor}
           labelColor={colors.labelColor}
           backgroundColor={colors.backgroundColor}
           className="clocks-stacked"
+          showLabel={showLabel}
         />
+      );
+    }
+
+    if (widget.key === "oscTimer") {
+      const timerName = item.settings?.oscTimerName || "default";
+      const timer = oscTimers[timerName] || { startedAt: null, elapsed: 0 };
+      const displayTimeMs = timer.startedAt
+        ? timer.elapsed + (currentTick - timer.startedAt)
+        : timer.elapsed;
+      const displayTime = new Date(displayTimeMs).toISOString().substr(11, 8);
+
+      return (
+        <div
+          className="monitor"
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
+          {isEditing && (
+            <div className="widget-control">
+              <label htmlFor={`osc-timer-name-${item.i}`}>Timer Name</label>
+              <input
+                type="text"
+                id={`osc-timer-name-${item.i}`}
+                value={timerName}
+                onChange={(e) =>
+                  handleUpdateWidgetSettings(item.i, {
+                    oscTimerName: e.target.value || undefined,
+                  })
+                }
+                placeholder="default"
+              />
+            </div>
+          )}
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || timerName}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{ color: colors.faceColor ?? state.clockColor }}
+          >
+            {displayTime}
+          </div>
+        </div>
       );
     }
 
@@ -1051,6 +1324,7 @@ function App() {
         >
           {gridWidth > 0 ? (
             <GridLayout
+              key={selectedLayoutId}
               layout={draftItems}
               cols={12}
               rowHeight={60}
@@ -1124,6 +1398,17 @@ function App() {
           ) : null}
         </div>
       </div>
+
+      <PromptDialog
+        open={!!renameTargetId}
+        title="Rename layout"
+        message="Enter a new name for this layout."
+        value={renameValue}
+        confirmLabel="Save name"
+        onChange={setRenameValue}
+        onSubmit={handleRenameSubmit}
+        onCancel={handleRenameCancel}
+      />
     </div>
   );
 }

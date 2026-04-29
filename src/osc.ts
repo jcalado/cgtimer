@@ -1,6 +1,8 @@
 import osc, { OSCMessage, UDPPort } from "osc";
 import store from "./store";
 
+type TimerAction = "start" | "stop" | "reset" | "toggle" | "set";
+
 class oscListener {
   port: number;
   currentTime: number;
@@ -11,8 +13,12 @@ class oscListener {
   stopped: boolean;
   udpPort: UDPPort | undefined;
   onLayoutLoad?: (layoutName: string) => void;
+  onTimerCommand?: (name: string, action: TimerAction, value?: number) => void;
 
-  constructor(onLayoutLoad?: (layoutName: string) => void) {
+  constructor(
+    onLayoutLoad?: (layoutName: string) => void,
+    onTimerCommand?: (name: string, action: TimerAction, value?: number) => void
+  ) {
     this.currentTime = 0;
     this.remainingTime = 0;
     this.totalTime = 0;
@@ -21,6 +27,7 @@ class oscListener {
     this.stopped = false;
     this.udpPort = undefined;
     this.onLayoutLoad = onLayoutLoad;
+    this.onTimerCommand = onTimerCommand;
 
     this.start();
 
@@ -44,6 +51,12 @@ class oscListener {
         if (typeof firstArg?.value === "string" && this.onLayoutLoad) {
           this.onLayoutLoad(firstArg.value);
         }
+        return;
+      }
+
+      // Handle timer commands: /timer/{name}/{action}
+      if (message["address"].startsWith("/timer/")) {
+        this.parseTimerCommand(message);
         return;
       }
 
@@ -105,6 +118,33 @@ class oscListener {
     // if (message["address"].startsWith("/from-ontime/expectedFinish")) {
     //   console.log(Utils.msToTime(args[0]["value"]));
     // }
+  }
+
+  private parseTimerCommand = (message: OSCMessage) => {
+    if (!this.onTimerCommand) return;
+
+    // Parse /timer/{name}/{action} format
+    const parts = message["address"].split("/").filter(Boolean);
+    // parts = ["timer", "{name}", "{action}"]
+    if (parts.length < 3) return;
+
+    const name = parts[1];
+    const action = parts[2] as TimerAction;
+
+    // Validate action
+    const validActions: TimerAction[] = ["start", "stop", "reset", "toggle", "set"];
+    if (!validActions.includes(action)) return;
+
+    // Get value for "set" action
+    let value: number | undefined;
+    if (action === "set" && message["args"]?.length > 0) {
+      const firstArg = message["args"][0];
+      if (typeof firstArg?.value === "number") {
+        value = firstArg.value;
+      }
+    }
+
+    this.onTimerCommand(name, action, value);
   }
 
   public stop = () => {
