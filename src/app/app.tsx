@@ -1198,6 +1198,31 @@ function App() {
     window.api.send("window:toggle-fullscreen");
   };
 
+  // "F" toggles fullscreen, except while typing in an input field or
+  // when a modifier is held (so Ctrl-F / Cmd-F still work normally).
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== "f" && event.key !== "F") return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+      event.preventDefault();
+      window.api.send("window:toggle-fullscreen");
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const selectedLayout = useMemo(
     () => layouts.find((l) => l.id === selectedLayoutId) ?? layouts[0],
     [layouts, selectedLayoutId]
