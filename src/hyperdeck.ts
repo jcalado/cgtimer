@@ -41,6 +41,7 @@ export type HyperDeckSnapshot = {
 };
 
 const RECONNECT_DELAY_MS = 5000;
+const POLL_INTERVAL_MS = 500;
 
 const parseStatus = (raw: string | undefined): HyperDeckStatus => {
   switch ((raw || "").toLowerCase()) {
@@ -67,6 +68,7 @@ export class HyperDeckClient extends EventEmitter {
   private socket: net.Socket | null = null;
   private buffer = "";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
   private disposed = false;
 
   status: HyperDeckStatus = "unknown";
@@ -107,6 +109,12 @@ export class HyperDeckClient extends EventEmitter {
       // Subscribe to async transport notifications and ask for the current state.
       socket.write("notify: transport: true\r\n");
       socket.write("transport info\r\n");
+      // Some firmwares don't push transport changes reliably; poll as a fallback.
+      this.pollTimer = setInterval(() => {
+        if (this.socket && this.connected) {
+          this.socket.write("transport info\r\n");
+        }
+      }, POLL_INTERVAL_MS);
     });
 
     socket.on("data", (data: string) => this.ingest(data));
@@ -122,6 +130,10 @@ export class HyperDeckClient extends EventEmitter {
     socket.on("close", () => {
       const wasConnected = this.connected;
       this.connected = false;
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = null;
+      }
       this.status = "unknown";
       this.recordingSince = null;
       this.displayTimecode = "";
@@ -145,6 +157,10 @@ export class HyperDeckClient extends EventEmitter {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
     if (this.socket) {
       this.socket.destroy();
@@ -211,6 +227,7 @@ export class HyperDeckClient extends EventEmitter {
     const codeMatch = /^(\d{3})\s+(.+?):?$/.exec(head);
     if (!codeMatch) return;
     const code = parseInt(codeMatch[1], 10);
+    const headerText = codeMatch[2].trim().toLowerCase();
     const fields: Record<string, string> = {};
     for (let i = 1; i < lines.length; i++) {
       const idx = lines[i].indexOf(":");
@@ -219,8 +236,9 @@ export class HyperDeckClient extends EventEmitter {
         lines[i].slice(idx + 1).trim();
     }
 
-    // Code 508 = transport info (sync reply or async push).
-    if (code === 508) {
+    // Sync reply to `transport info` returns code 208; async push uses 508.
+    // Match on the header text so we handle both consistently.
+    if (headerText === "transport info") {
       this.applyTransportInfo(fields);
     }
   }

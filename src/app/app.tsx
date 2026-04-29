@@ -2118,23 +2118,18 @@ function App() {
         recorders.find((r) => r.id === node.settings?.recorderId) ||
         recorders[0];
       const recording = recorder?.status === "record";
-      const elapsedMs = recording && recorder?.recordingSince
-        ? Math.max(0, now - recorder.recordingSince)
-        : 0;
+      // HyperDeck reports timecode as HH:MM:SS:FF or HH:MM:SS;FF (drop-frame).
+      // Strip the frame portion so the widget shows the same HH:MM:SS as our other timers.
+      const tcMatch = /^(\d{2}:\d{2}:\d{2})[:;]\d{2}/.exec(recorder?.displayTimecode || "");
       const display = recording
-        ? Utils.msToTime(elapsedMs)
+        ? tcMatch?.[1] ?? "00:00:00"
         : recorder
         ? recorder.connected
-          ? "STBY"
-          : "OFFLINE"
+          ? "ST:ND:BY"
+          : "OF:FL:NE"
         : "—";
       const labelText =
         customLabel || recorder?.label || "HyperDeck";
-      const faceColor = recording
-        ? "#dc2626"
-        : recorder && !recorder.connected
-        ? "#888"
-        : state.clockColor;
 
       return (
         <div
@@ -2175,16 +2170,27 @@ function App() {
               {labelText}
             </h1>
           )}
+          {recording && (
+            <span
+              style={{
+                position: "absolute",
+                top: "3cqh",
+                right: "3cqw",
+                fontFamily: "system-ui, sans-serif",
+                color: "#dc2626",
+                fontSize: "min(5cqw, 18cqh)",
+                lineHeight: 1,
+                pointerEvents: "none",
+              }}
+            >
+              ●
+            </span>
+          )}
           <div
             className="clock-face"
-            style={{
-              color: colors.faceColor ?? faceColor,
-              fontSize: recording ? undefined : "min(12cqw, 30cqh)",
-              fontFamily: recording ? undefined : "inherit",
-              letterSpacing: recording ? undefined : "0.1em",
-            }}
+            style={{ color: colors.faceColor ?? state.clockColor }}
           >
-            {recording ? `● ${display}` : display}
+            {display}
           </div>
         </div>
       );
