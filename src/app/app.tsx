@@ -1,16 +1,46 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import GridLayout, { Layout } from "react-grid-layout";
 import {
-  Ban,
-  GripVertical,
-  Maximize2,
-  Minimize2,
-  Palette,
-  Plus,
-  Repeat,
-  Save,
-  Trash2,
-} from "lucide-react";
+  Body1Strong,
+  Button,
+  Caption1,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  Dropdown,
+  Field,
+  Input,
+  Option,
+  Popover,
+  PopoverSurface,
+  PopoverTrigger,
+  Switch,
+  Tooltip,
+  makeStyles,
+  mergeClasses,
+  shorthands,
+  tokens,
+} from "@fluentui/react-components";
+import {
+  AddRegular,
+  ArrowRepeatAllRegular,
+  ColorRegular,
+  CopyRegular,
+  DeleteRegular,
+  DismissRegular,
+  DocumentAddRegular,
+  EditRegular,
+  EyeRegular,
+  FullScreenMaximizeRegular,
+  FullScreenMinimizeRegular,
+  ProhibitedRegular,
+  ReOrderRegular,
+  RenameRegular,
+  SaveRegular,
+} from "@fluentui/react-icons";
 import { Utils } from "../utils";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -68,17 +98,181 @@ type TimerMonitorProps = {
   showLabel?: boolean;
 };
 
-type PromptDialogProps = {
-  open: boolean;
-  title: string;
-  message?: string;
-  value: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-};
+const useStyles = makeStyles({
+  layoutPanel: {
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
+    position: "relative",
+    rowGap: tokens.spacingVerticalM,
+  },
+  dock: {
+    position: "absolute",
+    display: "flex",
+    flexDirection: "column",
+    rowGap: tokens.spacingVerticalS,
+    zIndex: 10,
+    backgroundColor: tokens.colorNeutralBackground2,
+    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke1),
+    ...shorthands.borderRadius(tokens.borderRadiusMedium),
+    boxShadow: tokens.shadow16,
+    ...shorthands.padding(tokens.spacingVerticalS),
+  },
+  dockHandle: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: tokens.spacingHorizontalXS,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+    cursor: "move",
+    userSelect: "none",
+    paddingLeft: tokens.spacingHorizontalXS,
+    paddingRight: tokens.spacingHorizontalXS,
+    paddingTop: tokens.spacingVerticalXXS,
+    paddingBottom: tokens.spacingVerticalXXS,
+  },
+  dockSection: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: tokens.spacingVerticalXS,
+  },
+  dockMeta: {
+    color: tokens.colorNeutralForeground3,
+  },
+  dockButtonRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    columnGap: tokens.spacingHorizontalXS,
+    rowGap: tokens.spacingVerticalXS,
+  },
+  dockButtonRowSingle: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: tokens.spacingVerticalXS,
+  },
+  paletteHeading: {
+    color: tokens.colorNeutralForeground3,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    paddingTop: tokens.spacingVerticalXS,
+  },
+  dockResize: {
+    height: "8px",
+    cursor: "ew-resize",
+    backgroundColor: tokens.colorNeutralBackground3,
+    ...shorthands.borderRadius(tokens.borderRadiusSmall),
+    marginTop: tokens.spacingVerticalXXS,
+    ":hover": {
+      backgroundColor: tokens.colorNeutralBackground3Hover,
+    },
+  },
+  gridArea: {
+    flex: 1,
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
+  },
+  gridAreaEditing: {
+    ...shorthands.border("1px", "dashed", tokens.colorNeutralStroke2),
+    ...shorthands.borderRadius(tokens.borderRadiusMedium),
+    backgroundColor: tokens.colorNeutralBackground1,
+    paddingLeft: tokens.spacingHorizontalXS,
+    paddingRight: tokens.spacingHorizontalXS,
+    paddingTop: tokens.spacingVerticalXS,
+    paddingBottom: tokens.spacingVerticalXS,
+  },
+  widgetCard: {
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    backgroundColor: tokens.colorNeutralBackground1,
+    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
+    ...shorthands.borderRadius(tokens.borderRadiusMedium),
+  },
+  widgetCardDisplay: {
+    backgroundColor: "transparent",
+    ...shorthands.borderStyle("none"),
+  },
+  widgetCardHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    paddingLeft: tokens.spacingHorizontalS,
+    paddingRight: tokens.spacingHorizontalXS,
+    paddingTop: tokens.spacingVerticalXXS,
+    paddingBottom: tokens.spacingVerticalXXS,
+    cursor: "move",
+  },
+  widgetCardTitle: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground1,
+  },
+  widgetCardSubtitle: {
+    fontSize: tokens.fontSizeBase100,
+    color: tokens.colorNeutralForeground3,
+  },
+  widgetCardBody: {
+    flex: 1,
+    minHeight: 0,
+    display: "flex",
+    position: "relative",
+  },
+  widgetCardActions: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: "2px",
+  },
+  widgetControl: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    columnGap: tokens.spacingHorizontalS,
+    position: "absolute",
+    top: tokens.spacingVerticalXS,
+    right: tokens.spacingHorizontalXS,
+    zIndex: 2,
+  },
+  configPopover: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: tokens.spacingVerticalS,
+    minWidth: "260px",
+  },
+  configRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    columnGap: tokens.spacingHorizontalM,
+  },
+  configFooter: {
+    display: "flex",
+    justifyContent: "space-between",
+    columnGap: tokens.spacingHorizontalS,
+    paddingTop: tokens.spacingVerticalXS,
+  },
+  colorSwatchInput: {
+    width: "36px",
+    height: "28px",
+    ...shorthands.padding("0"),
+    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke1),
+    ...shorthands.borderRadius(tokens.borderRadiusSmall),
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: "pointer",
+  },
+  fullscreenButton: {
+    position: "absolute",
+    bottom: tokens.spacingVerticalL,
+    right: tokens.spacingHorizontalL,
+    zIndex: 9999,
+  },
+  promptField: {
+    width: "100%",
+  },
+});
 
 const PromptDialog = ({
   open,
@@ -90,40 +284,55 @@ const PromptDialog = ({
   onChange,
   onSubmit,
   onCancel,
-}: PromptDialogProps) => {
-  if (!open) return null;
+}: {
+  open: boolean;
+  title: string;
+  message?: string;
+  value: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) => {
+  const styles = useStyles();
   return (
-    <div className="prompt-overlay" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="prompt-modal">
-        <div className="prompt-modal__header">
-          <div className="prompt-modal__title">{title}</div>
-          {message ? <div className="prompt-modal__subtitle">{message}</div> : null}
-        </div>
+    <Dialog
+      open={open}
+      onOpenChange={(_e, data) => {
+        if (!data.open) onCancel();
+      }}
+    >
+      <DialogSurface>
         <form
-          className="prompt-modal__body"
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
           }}
         >
-          <input
-            autoFocus
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="prompt-modal__input"
-          />
-          <div className="prompt-modal__actions">
-            <button type="button" onClick={onCancel}>
-              {cancelLabel}
-            </button>
-            <button type="submit" className="primary">
-              {confirmLabel}
-            </button>
-          </div>
+          <DialogBody>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogContent>
+              <Field label={message} className={styles.promptField}>
+                <Input
+                  autoFocus
+                  value={value}
+                  onChange={(_e, data) => onChange(data.value)}
+                />
+              </Field>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" type="button" onClick={onCancel}>
+                {cancelLabel}
+              </Button>
+              <Button appearance="primary" type="submit">
+                {confirmLabel}
+              </Button>
+            </DialogActions>
+          </DialogBody>
         </form>
-      </div>
-    </div>
+      </DialogSurface>
+    </Dialog>
   );
 };
 
@@ -147,7 +356,9 @@ const TimerMonitor = ({
       {showLabel && (
         <h1 style={labelColor ? { color: labelColor } : undefined}>{title}</h1>
       )}
-      <div className={faceClass} style={{ color }}>{value}</div>
+      <div className={faceClass} style={{ color }}>
+        {value}
+      </div>
     </div>
   );
 };
@@ -167,24 +378,16 @@ type ColorConfigPanelProps = {
 };
 
 const ColorConfigPanel = ({ item, onChange, onClose }: ColorConfigPanelProps) => {
+  const styles = useStyles();
   const colors = getWidgetColors(item.settings);
   const showLabel = item.settings?.showLabel !== false;
   const customLabel = item.settings?.customLabel ?? "";
 
-  const handleChange =
+  const handleColorChange =
     (key: "labelColor" | "faceColor" | "backgroundColor") =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      onChange({ [key]: value || undefined });
+      onChange({ [key]: e.target.value || undefined });
     };
-
-  const handleShowLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ showLabel: e.target.checked });
-  };
-
-  const handleCustomLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ customLabel: e.target.value || undefined });
-  };
 
   const handleReset = () => {
     onChange({
@@ -197,70 +400,66 @@ const ColorConfigPanel = ({ item, onChange, onClose }: ColorConfigPanelProps) =>
   };
 
   return (
-    <div className="widget-config-overlay" role="dialog" aria-label="Widget settings">
-      <div className="widget-config">
-        <div className="widget-config__header">
-          <div>
-            <div className="widget-config__title">Widget Settings</div>
-            <div className="widget-config__subtitle">Customize appearance</div>
-          </div>
-          <button type="button" className="quiet" onClick={onClose} aria-label="Close settings">
-            x
-          </button>
-        </div>
-        <div className="widget-config__body">
-          <label className="widget-config__row">
-            <span>Show Label</span>
-            <input
-              type="checkbox"
-              checked={showLabel}
-              onChange={handleShowLabelChange}
-            />
-          </label>
-          <label className="widget-config__row">
-            <span>Custom Label</span>
-            <input
-              type="text"
-              value={customLabel}
-              onChange={handleCustomLabelChange}
-              placeholder="Default"
-              disabled={!showLabel}
-            />
-          </label>
-          <label className="widget-config__row">
-            <span>Label Color</span>
-            <input
-              type="color"
-              value={colors.labelColor ?? "#aaaaaa"}
-              onChange={handleChange("labelColor")}
-              disabled={!showLabel}
-            />
-          </label>
-          <label className="widget-config__row">
-            <span>Clock Face</span>
-            <input
-              type="color"
-              value={colors.faceColor ?? "#e5e9ff"}
-              onChange={handleChange("faceColor")}
-            />
-          </label>
-          <label className="widget-config__row">
-            <span>Background</span>
-            <input
-              type="color"
-              value={colors.backgroundColor ?? "#242424"}
-              onChange={handleChange("backgroundColor")}
-            />
-          </label>
-        </div>
-        <div className="widget-config__footer">
-          <button type="button" onClick={handleReset}>
-            Reset to defaults
-          </button>
-          <button type="button" className="primary" onClick={onClose}>
-            Done
-          </button>
-        </div>
+    <div className={styles.configPopover}>
+      <Body1Strong>Widget settings</Body1Strong>
+
+      <div className={styles.configRow}>
+        <Caption1>Show label</Caption1>
+        <Switch
+          checked={showLabel}
+          onChange={(_e, data) => onChange({ showLabel: data.checked })}
+        />
+      </div>
+
+      <Field label="Custom label">
+        <Input
+          value={customLabel}
+          placeholder="Default"
+          disabled={!showLabel}
+          onChange={(_e, data) =>
+            onChange({ customLabel: data.value || undefined })
+          }
+        />
+      </Field>
+
+      <div className={styles.configRow}>
+        <Caption1>Label color</Caption1>
+        <input
+          type="color"
+          className={styles.colorSwatchInput}
+          value={colors.labelColor ?? "#aaaaaa"}
+          onChange={handleColorChange("labelColor")}
+          disabled={!showLabel}
+        />
+      </div>
+
+      <div className={styles.configRow}>
+        <Caption1>Clock face</Caption1>
+        <input
+          type="color"
+          className={styles.colorSwatchInput}
+          value={colors.faceColor ?? "#e5e9ff"}
+          onChange={handleColorChange("faceColor")}
+        />
+      </div>
+
+      <div className={styles.configRow}>
+        <Caption1>Background</Caption1>
+        <input
+          type="color"
+          className={styles.colorSwatchInput}
+          value={colors.backgroundColor ?? "#242424"}
+          onChange={handleColorChange("backgroundColor")}
+        />
+      </div>
+
+      <div className={styles.configFooter}>
+        <Button appearance="subtle" onClick={handleReset}>
+          Reset
+        </Button>
+        <Button appearance="primary" onClick={onClose}>
+          Done
+        </Button>
       </div>
     </div>
   );
@@ -444,6 +643,7 @@ const createDefaultLayout = (): SavedLayout => ({
 });
 
 function App() {
+  const styles = useStyles();
   const initialLayouts = useMemo(() => {
     const stored = loadSavedLayouts();
     const hydrated = stored.length ? stored : [createDefaultLayout()];
@@ -511,6 +711,8 @@ function App() {
   const dragOriginRef = useRef<WidgetLayoutItem[] | null>(null);
   const [renameTargetId, setRenameTargetId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveAsValue, setSaveAsValue] = useState("");
 
   useEffect(() => {
     window.api.send("window:get-fullscreen-state");
@@ -623,7 +825,6 @@ function App() {
 
   useEffect(() => {
     if (selectedLayout) {
-      // Deep copy to avoid reference issues with react-grid-layout
       setDraftItems(selectedLayout.items.map((item) => ({ ...item })));
     }
   }, [selectedLayout]);
@@ -680,7 +881,7 @@ function App() {
         const delta = event.clientX - dockResizeRef.current.startX;
         setDockState((prev) => ({
           ...prev,
-          width: Math.max(200, dockResizeRef.current!.startWidth + delta),
+          width: Math.max(220, dockResizeRef.current!.startWidth + delta),
         }));
       }
     };
@@ -707,7 +908,6 @@ function App() {
       );
       if (!target) return;
       setSelectedLayoutId(target.id);
-      // Deep copy items to avoid reference issues with react-grid-layout
       setDraftItems(target.items.map((item) => ({ ...item })));
       setMode("preview");
       setShowEditor(false);
@@ -914,7 +1114,12 @@ function App() {
   };
 
   const handleSaveAs = () => {
-    const name = prompt("Name for new layout?");
+    setSaveAsValue("");
+    setSaveAsOpen(true);
+  };
+
+  const handleSaveAsSubmit = () => {
+    const name = saveAsValue.trim();
     if (!name) return;
     const newLayout: SavedLayout = {
       id: generateId(),
@@ -924,6 +1129,7 @@ function App() {
     };
     setLayouts((prev) => [...prev, newLayout]);
     setSelectedLayoutId(newLayout.id);
+    setSaveAsOpen(false);
     setMode("preview");
     setShowEditor(false);
   };
@@ -1008,24 +1214,24 @@ function App() {
       return (
         <div className="monitor" style={monitorStyle}>
           {isEditing && (
-            <div className="widget-control">
-              <label htmlFor={`timezone-${item.i}`}>Timezone</label>
-              <select
-                id={`timezone-${item.i}`}
-                value={selectedTimezone?.id ?? ""}
-                onChange={(e) =>
+            <div className={styles.widgetControl}>
+              <Dropdown
+                size="small"
+                value={selectedTimezone?.label ?? "Local time"}
+                selectedOptions={[selectedTimezone?.id ?? ""]}
+                onOptionSelect={(_e, data) =>
                   handleUpdateWidgetSettings(item.i, {
-                    timezoneId: e.target.value || undefined,
+                    timezoneId: data.optionValue || undefined,
                   })
                 }
               >
-                <option value="">Local time</option>
+                <Option value="">Local time</Option>
                 {timezones.map((tz) => (
-                  <option key={tz.id} value={tz.id}>
+                  <Option key={tz.id} value={tz.id} text={tz.label}>
                     {tz.label}
-                  </option>
+                  </Option>
                 ))}
-              </select>
+              </Dropdown>
             </div>
           )}
           {showLabel && (
@@ -1107,7 +1313,11 @@ function App() {
             aria-label={loopAriaLabel}
             title={loopAriaLabel}
           >
-            {state.loop ? <Repeat size={56} strokeWidth={2.5} /> : <Ban size={56} />}
+            {state.loop ? (
+              <ArrowRepeatAllRegular fontSize={56} />
+            ) : (
+              <ProhibitedRegular fontSize={56} />
+            )}
           </div>
         </div>
       );
@@ -1157,18 +1367,16 @@ function App() {
           }
         >
           {isEditing && (
-            <div className="widget-control">
-              <label htmlFor={`osc-timer-name-${item.i}`}>Timer Name</label>
-              <input
-                type="text"
-                id={`osc-timer-name-${item.i}`}
+            <div className={styles.widgetControl}>
+              <Input
+                size="small"
                 value={timerName}
-                onChange={(e) =>
+                placeholder="default"
+                onChange={(_e, data) =>
                   handleUpdateWidgetSettings(item.i, {
-                    oscTimerName: e.target.value || undefined,
+                    oscTimerName: data.value || undefined,
                   })
                 }
-                placeholder="default"
               />
             </div>
           )}
@@ -1192,6 +1400,101 @@ function App() {
 
   const isEditing = showEditor && mode === "edit";
 
+  const renderDock = () => (
+    <div
+      className={styles.dock}
+      style={{ left: dockState.x, top: dockState.y, width: dockState.width }}
+    >
+      <div className={styles.dockHandle} onMouseDown={handleDockDragStart}>
+        <ReOrderRegular fontSize={14} />
+        <span>Layout controls</span>
+      </div>
+
+      <div className={styles.dockSection}>
+        <Field label="Layout">
+          <Dropdown
+            value={selectedLayout?.name ?? ""}
+            selectedOptions={selectedLayout ? [selectedLayout.id] : []}
+            onOptionSelect={(_e, data) => {
+              if (data.optionValue) setSelectedLayoutId(data.optionValue);
+            }}
+          >
+            {layouts.map((layout) => (
+              <Option key={layout.id} value={layout.id} text={layout.name}>
+                {layout.name}
+              </Option>
+            ))}
+          </Dropdown>
+        </Field>
+        <Caption1 className={styles.dockMeta}>
+          Last saved:{" "}
+          {selectedLayout?.updatedAt
+            ? new Date(selectedLayout.updatedAt).toLocaleString()
+            : "--"}
+        </Caption1>
+      </div>
+
+      <div className={styles.dockButtonRow}>
+        <Button
+          appearance="primary"
+          icon={<SaveRegular />}
+          onClick={handleSaveLayout}
+        >
+          Save
+        </Button>
+        <Button
+          appearance={mode === "edit" ? "secondary" : "outline"}
+          icon={mode === "edit" ? <EyeRegular /> : <EditRegular />}
+          onClick={() => setMode((prev) => (prev === "edit" ? "preview" : "edit"))}
+        >
+          {mode === "edit" ? "Preview" : "Edit"}
+        </Button>
+        <Button icon={<AddRegular />} onClick={handleSaveAs}>
+          Save as
+        </Button>
+        <Button icon={<CopyRegular />} onClick={handleDuplicateLayout}>
+          Duplicate
+        </Button>
+        <Button icon={<RenameRegular />} onClick={handleRenameLayout}>
+          Rename
+        </Button>
+        <Button icon={<DocumentAddRegular />} onClick={handleNewLayout}>
+          New
+        </Button>
+      </div>
+
+      <Button
+        appearance="subtle"
+        icon={<DeleteRegular />}
+        onClick={handleDeleteLayout}
+      >
+        Delete layout
+      </Button>
+
+      <Caption1 className={styles.paletteHeading}>Add widget</Caption1>
+      <div className={styles.dockButtonRowSingle}>
+        {Object.values(widgetCatalog).map((widget) => (
+          <Tooltip
+            key={widget.key}
+            content={widget.description}
+            relationship="description"
+            withArrow
+          >
+            <Button
+              appearance="secondary"
+              icon={<AddRegular />}
+              onClick={() => handleAddWidget(widget.key)}
+            >
+              {widget.label}
+            </Button>
+          </Tooltip>
+        ))}
+      </div>
+
+      <div className={styles.dockResize} onMouseDown={handleDockResizeStart} />
+    </div>
+  );
+
   return (
     <div
       className="app"
@@ -1200,133 +1503,44 @@ function App() {
       onMouseLeave={() => setIsHovered(false)}
     >
       {isHovered && (
-        <button
-          onClick={handleToggleFullscreen}
-          style={{
-            position: "absolute",
-            bottom: "20px",
-            right: "20px",
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
-            borderRadius: "8px",
-            padding: "12px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.9)";
-            e.currentTarget.style.transform = "scale(1.05)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
-            e.currentTarget.style.transform = "scale(1)";
-          }}
-          title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-        >
-          {isFullscreen ? (
-            <Minimize2 size={24} color="white" />
-          ) : (
-            <Maximize2 size={24} color="white" />
-          )}
-        </button>
+        <div className={styles.fullscreenButton}>
+          <Tooltip
+            content={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            relationship="label"
+            withArrow
+          >
+            <Button
+              appearance="subtle"
+              size="large"
+              icon={
+                isFullscreen ? (
+                  <FullScreenMinimizeRegular />
+                ) : (
+                  <FullScreenMaximizeRegular />
+                )
+              }
+              onClick={handleToggleFullscreen}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            />
+          </Tooltip>
+        </div>
       )}
 
-      <div className="layout-panel">
-        {showEditor && (
-          <div
-            className="layout-dock"
-            style={{ left: dockState.x, top: dockState.y, width: dockState.width }}
-          >
-            <div className="layout-dock__drag-handle" onMouseDown={handleDockDragStart}>
-              <GripVertical size={14} />
-              <span>Layout controls</span>
-            </div>
-            <div className="layout-header layout-dock__handle">
-              <div className="layout-select">
-                <label htmlFor="layout-selector">Layout</label>
-                <select
-                  id="layout-selector"
-                  value={selectedLayout?.id ?? ""}
-                  onChange={(e) => setSelectedLayoutId(e.target.value)}
-                >
-                  {layouts.map((layout) => (
-                    <option key={layout.id} value={layout.id}>
-                      {layout.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="layout-meta">
-                  Last saved:{" "}
-                  {selectedLayout?.updatedAt
-                    ? new Date(selectedLayout.updatedAt).toLocaleString()
-                    : "--"}
-                </span>
-              </div>
-              <div className="layout-actions">
-                <button type="button" onClick={handleSaveLayout}>
-                  <Save size={16} /> Save &amp; Display
-                </button>
-                <button type="button" onClick={handleSaveAs}>
-                  <Plus size={16} /> Save as
-                </button>
-                <button type="button" onClick={handleDuplicateLayout}>
-                  Duplicate
-                </button>
-                <button type="button" onClick={handleRenameLayout}>
-                  Rename
-                </button>
-                <button type="button" onClick={handleNewLayout}>
-                  New
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteLayout}
-                  className="danger"
-                  title="Delete selected layout"
-                >
-                  <Trash2 size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMode((prev) => (prev === "edit" ? "preview" : "edit"))
-                  }
-                  className={mode === "preview" ? "muted" : ""}
-                >
-                  {mode === "edit" ? "Preview" : "Edit"}
-                </button>
-              </div>
-            </div>
-
-            <div className="widget-palette">
-              {Object.values(widgetCatalog).map((widget) => (
-                <button
-                  key={widget.key}
-                  type="button"
-                  onClick={() => handleAddWidget(widget.key)}
-                  title={widget.description}
-                >
-                  <Plus size={14} /> Add {widget.label}
-                </button>
-              ))}
-            </div>
-            <div className="layout-dock__resize" onMouseDown={handleDockResizeStart} />
-          </div>
-        )}
+      <div className={styles.layoutPanel}>
+        {showEditor && renderDock()}
 
         <div
-          className={`grid-area ${showEditor ? "" : "grid-area--display"}`}
+          className={mergeClasses(
+            styles.gridArea,
+            showEditor && styles.gridAreaEditing
+          )}
           ref={gridContainerRef}
         >
           {gridWidth > 0 ? (
             <GridLayout
               key={selectedLayoutId}
               layout={draftItems}
-              cols={12}
+              cols={GRID_COLS}
               rowHeight={60}
               width={gridWidth}
               margin={[12, 12]}
@@ -1334,7 +1548,7 @@ function App() {
               onLayoutChange={handleLayoutChange}
               onDragStart={showEditor ? handleDragStart : undefined}
               onDragStop={showEditor ? handleDragStop : undefined}
-              draggableHandle={showEditor ? ".widget-card__header" : undefined}
+              draggableHandle={showEditor ? ".widget-card-handle" : undefined}
               isDraggable={isEditing}
               isResizable={isEditing}
               preventCollision
@@ -1345,50 +1559,72 @@ function App() {
                 return (
                   <div
                     key={item.i}
-                    className={`widget-card ${
-                      showEditor ? "" : "widget-card--display"
-                    }`}
+                    className={mergeClasses(
+                      styles.widgetCard,
+                      !showEditor && styles.widgetCardDisplay
+                    )}
                   >
                     {showEditor && (
-                      <div className="widget-card__header">
+                      <div
+                        className={mergeClasses(
+                          styles.widgetCardHeader,
+                          "widget-card-handle"
+                        )}
+                      >
                         <div>
-                          <div className="widget-card__title">
+                          <Body1Strong className={styles.widgetCardTitle}>
                             {widget?.label ?? "Widget"}
-                          </div>
-                          <div className="widget-card__subtitle">
+                          </Body1Strong>
+                          <Caption1 className={styles.widgetCardSubtitle} block>
                             {widget?.description}
-                          </div>
+                          </Caption1>
                         </div>
                         {isEditing && (
-                          <div className="widget-card__header-actions">
-                            <button
-                              type="button"
-                              className="quiet"
-                              onClick={() => setConfiguringWidgetId(item.i)}
-                              aria-label="Configure widget colors"
+                          <div className={styles.widgetCardActions}>
+                            <Popover
+                              open={configuringWidgetId === item.i}
+                              onOpenChange={(_e, data) =>
+                                setConfiguringWidgetId(
+                                  data.open ? item.i : null
+                                )
+                              }
+                              positioning="below-end"
+                              trapFocus
                             >
-                              <Palette size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              className="quiet"
-                              onClick={() => handleRemoveWidget(item.i)}
+                              <PopoverTrigger disableButtonEnhancement>
+                                <Button
+                                  appearance="subtle"
+                                  size="small"
+                                  icon={<ColorRegular />}
+                                  aria-label="Configure widget"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </PopoverTrigger>
+                              <PopoverSurface>
+                                <ColorConfigPanel
+                                  item={item}
+                                  onChange={(updates) =>
+                                    handleUpdateWidgetSettings(item.i, updates)
+                                  }
+                                  onClose={() => setConfiguringWidgetId(null)}
+                                />
+                              </PopoverSurface>
+                            </Popover>
+                            <Button
+                              appearance="subtle"
+                              size="small"
+                              icon={<DismissRegular />}
                               aria-label="Remove widget"
-                            >
-                              ×
-                            </button>
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveWidget(item.i);
+                              }}
+                            />
                           </div>
                         )}
                       </div>
                     )}
-                    <div className="widget-card__body">
-                      {configuringWidgetId === item.i && (
-                        <ColorConfigPanel
-                          item={item}
-                          onChange={(updates) => handleUpdateWidgetSettings(item.i, updates)}
-                          onClose={() => setConfiguringWidgetId(null)}
-                        />
-                      )}
+                    <div className={styles.widgetCardBody}>
                       {renderWidget(item, isEditing)}
                     </div>
                   </div>
@@ -1408,6 +1644,17 @@ function App() {
         onChange={setRenameValue}
         onSubmit={handleRenameSubmit}
         onCancel={handleRenameCancel}
+      />
+
+      <PromptDialog
+        open={saveAsOpen}
+        title="Save layout as"
+        message="Name for the new layout"
+        value={saveAsValue}
+        confirmLabel="Save"
+        onChange={setSaveAsValue}
+        onSubmit={handleSaveAsSubmit}
+        onCancel={() => setSaveAsOpen(false)}
       />
     </div>
   );
