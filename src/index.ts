@@ -149,11 +149,6 @@ const createWindow = (): void => {
     mainWindow = null;
   });
 
-  // Open the DevTools.
-  if (isDebug && mainWindow) {
-    mainWindow.webContents.openDevTools();
-  }
-
   const buildMenu = () =>
     Menu.buildFromTemplate([
       {
