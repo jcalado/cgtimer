@@ -35,20 +35,62 @@ const getDisplayOrigin = (display: Display) => {
   };
 };
 
+const findPreferredDisplay = (displays: Display[]) => {
+  const targetDisplayId = store.get("application.display");
+  const targetLabel = store.get("application.displayLabel") || "";
+  const targetX = store.get("application.displayX");
+  const targetY = store.get("application.displayY");
+
+  // 1. Match by id (stable on macOS, sometimes unstable elsewhere).
+  const byId = displays.find(
+    (display) => display.id.toString() === String(targetDisplayId)
+  );
+  if (byId) return byId;
+
+  // 2. Fall back to label (e.g. "Studio Display") — survives id resets.
+  if (targetLabel) {
+    const byLabel = displays.find((display) => display.label === targetLabel);
+    if (byLabel) return byLabel;
+  }
+
+  // 3. Fall back to remembered origin — handles unlabeled monitors.
+  if (targetX !== 0 || targetY !== 0) {
+    const byOrigin = displays.find((display) => {
+      const origin = getDisplayOrigin(display);
+      return origin.x === targetX && origin.y === targetY;
+    });
+    if (byOrigin) return byOrigin;
+  }
+
+  return null;
+};
+
+const refreshDisplaySignature = (display: Display) => {
+  const origin = getDisplayOrigin(display);
+  store.set("application.display", display.id);
+  store.set("application.displayLabel", display.label || "");
+  store.set("application.displayX", origin.x);
+  store.set("application.displayY", origin.y);
+};
+
 const moveWindowToPreferredDisplay = (window: BrowserWindow) => {
   if (!window || window.isDestroyed()) {
     return;
   }
 
-  const targetDisplayId = store.get("application.display");
   const displays = screen.getAllDisplays();
-  const targetDisplay =
-    displays.find(
-      (display) => display.id.toString() === String(targetDisplayId)
-    ) || screen.getPrimaryDisplay();
+  const matched = findPreferredDisplay(displays);
+  const targetDisplay = matched || screen.getPrimaryDisplay();
 
   if (!targetDisplay) {
     return;
+  }
+
+  // Whenever we successfully match the configured preference, refresh the
+  // stored signature so reconnects on platforms with unstable display ids
+  // can still be matched by label or origin next time.
+  if (matched) {
+    refreshDisplaySignature(matched);
   }
 
   const { width, height } = window.getBounds();
@@ -265,14 +307,25 @@ ipcMain.handle("settings:get", (): StoreSchema => {
 });
 
 ipcMain.handle("settings:save", (_, settings: StoreSchema) => {
-  // Update each section
   store.set("server", settings.server);
   store.set("application", settings.application);
   store.set("production", settings.production);
   store.set("colors", settings.colors);
   store.set("timezones", settings.timezones);
 
-  // Notify main window of changes
+  // Refresh the display signature so a freshly-picked monitor can be
+  // re-matched after a disconnect even if its id changes.
+  const displays = screen.getAllDisplays();
+  const picked = displays.find(
+    (display) => display.id.toString() === String(settings.application.display)
+  );
+  if (picked) {
+    refreshDisplaySignature(picked);
+  }
+
+  if (mainWindow) {
+    moveWindowToPreferredDisplay(mainWindow);
+  }
   mainWindow?.webContents.send("settings:changed", settings);
 });
 

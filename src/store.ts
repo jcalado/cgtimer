@@ -10,6 +10,9 @@ export interface StoreSchema {
   };
   application: {
     display: number;
+    displayLabel: string;
+    displayX: number;
+    displayY: number;
     fullscreen: boolean;
   };
   production: {
@@ -55,6 +58,18 @@ const schema: Schema<StoreSchema> = {
     type: "object",
     properties: {
       display: {
+        type: "number",
+        default: 0,
+      },
+      displayLabel: {
+        type: "string",
+        default: "",
+      },
+      displayX: {
+        type: "number",
+        default: 0,
+      },
+      displayY: {
         type: "number",
         default: 0,
       },
@@ -141,6 +156,9 @@ const defaults: StoreSchema = {
   },
   application: {
     display: 0,
+    displayLabel: "",
+    displayX: 0,
+    displayY: 0,
     fullscreen: false,
   },
   production: {
