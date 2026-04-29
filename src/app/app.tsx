@@ -43,6 +43,7 @@ import {
 import {
   AddRegular,
   ArrowRepeatAllRegular,
+  ClockRegular,
   ColorRegular,
   CopyRegular,
   DeleteRegular,
@@ -52,7 +53,12 @@ import {
   EyeRegular,
   FullScreenMaximizeRegular,
   FullScreenMinimizeRegular,
+  GlobeRegular,
+  HistoryRegular,
+  HourglassRegular,
   ProhibitedRegular,
+  PulseRegular,
+  RecordRegular,
   ReOrderRegular,
   RenameRegular,
   SaveRegular,
@@ -84,6 +90,8 @@ type WidgetDefinition = {
   key: WidgetKind;
   label: string;
   description: string;
+  icon: React.ReactElement;
+  color: string;
 };
 
 type WidgetNode = {
@@ -123,36 +131,50 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     key: "worldClock",
     label: "World Clock",
     description: "Pick a configured timezone and pin it here",
+    icon: <GlobeRegular />,
+    color: "#3b82f6",
   },
   localClock: {
     key: "localClock",
     label: "Local Clock",
     description: "Shows the local system time",
+    icon: <ClockRegular />,
+    color: "#14b8a6",
   },
   primaryTimer: {
     key: "primaryTimer",
     label: "Remaining Timer",
     description: "Shows remaining time",
+    icon: <HourglassRegular />,
+    color: "#f59e0b",
   },
   secondaryTimer: {
     key: "secondaryTimer",
     label: "Elapsed Timer",
     description: "Shows elapsed time",
+    icon: <HistoryRegular />,
+    color: "#22c55e",
   },
   productionTimer: {
     key: "productionTimer",
     label: "Production Timer",
     description: "Displays production runtime or on-time if enabled",
+    icon: <RecordRegular />,
+    color: "#ef4444",
   },
   loopState: {
     key: "loopState",
     label: "Loop State",
     description: "Quick indicator for loop mode",
+    icon: <ArrowRepeatAllRegular />,
+    color: "#a855f7",
   },
   oscTimer: {
     key: "oscTimer",
     label: "OSC Timer",
     description: "Stopwatch triggered via OSC commands",
+    icon: <PulseRegular />,
+    color: "#ec4899",
   },
 };
 
@@ -2082,6 +2104,11 @@ function App() {
             >
               <Button
                 appearance="secondary"
+                icon={
+                  <span style={{ color: widget.color, display: "inline-flex" }}>
+                    {widget.icon}
+                  </span>
+                }
                 onClick={() => handleAddWidget(widget.key)}
               >
                 {widget.label}
