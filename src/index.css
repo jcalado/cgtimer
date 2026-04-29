@@ -44,6 +44,13 @@ body {
   overflow: hidden;
 }
 
+/* When no label is rendered, drop the top spacing reserved for it and
+   center the clock face on the full widget height. */
+.monitor:not(:has(> h1)) {
+  padding: 0;
+  justify-content: center;
+}
+
 .monitor h1 {
   font-size: clamp(14px, 8cqw, 8cqh);
   text-align: center;
