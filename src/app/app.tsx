@@ -52,19 +52,28 @@ import {
   DocumentAddRegular,
   EditRegular,
   EyeRegular,
+  FlagRegular,
   FullScreenMaximizeRegular,
   FullScreenMinimizeRegular,
   GlobeRegular,
   HistoryRegular,
   HourglassRegular,
+  PauseRegular,
+  PlayRegular,
+  PlayCircleRegular,
+  PlugConnectedRegular,
   ProhibitedRegular,
   PulseRegular,
+  RecordRegular,
   ReOrderRegular,
   RenameRegular,
   SaveRegular,
   SplitHorizontalRegular,
   SplitVerticalRegular,
+  StopRegular,
+  TextFontRegular,
 } from "@fluentui/react-icons";
+import { Utils } from "../utils";
 
 type WidgetKind =
   | "worldClock"
@@ -73,7 +82,12 @@ type WidgetKind =
   | "secondaryTimer"
   | "timeOfDayCountdown"
   | "loopState"
-  | "oscTimer";
+  | "oscTimer"
+  | "ontimeTimer"
+  | "ontimeTitle"
+  | "ontimePlayback"
+  | "ontimeOnAir"
+  | "ontimeExpectedFinish";
 
 type WidgetSettings = {
   timezoneId?: string;
@@ -86,13 +100,23 @@ type WidgetSettings = {
   targetTime?: string; // HH:MM:SS for timeOfDayCountdown
 };
 
+type WidgetGroup = "clocks" | "playback" | "timers" | "ontime";
+
 type WidgetDefinition = {
   key: WidgetKind;
   label: string;
   description: string;
   icon: React.ReactElement;
   color: string;
+  group: WidgetGroup;
 };
+
+const WIDGET_GROUPS: { id: WidgetGroup; label: string }[] = [
+  { id: "clocks", label: "Clocks" },
+  { id: "playback", label: "Playback" },
+  { id: "timers", label: "Timers" },
+  { id: "ontime", label: "Ontime" },
+];
 
 type WidgetNode = {
   type: "widget";
@@ -133,6 +157,7 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     description: "Pick a configured timezone and pin it here",
     icon: <GlobeRegular />,
     color: "#3b82f6",
+    group: "clocks",
   },
   localClock: {
     key: "localClock",
@@ -140,6 +165,7 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     description: "Shows the local system time",
     icon: <ClockRegular />,
     color: "#14b8a6",
+    group: "clocks",
   },
   primaryTimer: {
     key: "primaryTimer",
@@ -147,6 +173,7 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     description: "Shows remaining time",
     icon: <HourglassRegular />,
     color: "#f59e0b",
+    group: "playback",
   },
   secondaryTimer: {
     key: "secondaryTimer",
@@ -154,13 +181,7 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     description: "Shows elapsed time",
     icon: <HistoryRegular />,
     color: "#22c55e",
-  },
-  timeOfDayCountdown: {
-    key: "timeOfDayCountdown",
-    label: "Time-of-day Countdown",
-    description: "Counts down to a target wall-clock time",
-    icon: <CalendarClockRegular />,
-    color: "#ef4444",
+    group: "playback",
   },
   loopState: {
     key: "loopState",
@@ -168,6 +189,15 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     description: "Quick indicator for loop mode",
     icon: <ArrowRepeatAllRegular />,
     color: "#a855f7",
+    group: "playback",
+  },
+  timeOfDayCountdown: {
+    key: "timeOfDayCountdown",
+    label: "Time-of-day Countdown",
+    description: "Counts down to a target wall-clock time",
+    icon: <CalendarClockRegular />,
+    color: "#ef4444",
+    group: "timers",
   },
   oscTimer: {
     key: "oscTimer",
@@ -175,6 +205,47 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     description: "Stopwatch triggered via OSC commands",
     icon: <PulseRegular />,
     color: "#ec4899",
+    group: "timers",
+  },
+  ontimeTimer: {
+    key: "ontimeTimer",
+    label: "Ontime Timer",
+    description: "Mirrors the current timer from Ontime over OSC",
+    icon: <PlugConnectedRegular />,
+    color: "#10b981",
+    group: "ontime",
+  },
+  ontimeTitle: {
+    key: "ontimeTitle",
+    label: "Ontime Title",
+    description: "Title of the currently running Ontime event",
+    icon: <TextFontRegular />,
+    color: "#0ea5e9",
+    group: "ontime",
+  },
+  ontimePlayback: {
+    key: "ontimePlayback",
+    label: "Ontime Playback",
+    description: "Ontime playback state (play, pause, stop, roll, armed)",
+    icon: <PlayCircleRegular />,
+    color: "#84cc16",
+    group: "ontime",
+  },
+  ontimeOnAir: {
+    key: "ontimeOnAir",
+    label: "Ontime On-Air",
+    description: "On-air indicator from Ontime",
+    icon: <RecordRegular />,
+    color: "#dc2626",
+    group: "ontime",
+  },
+  ontimeExpectedFinish: {
+    key: "ontimeExpectedFinish",
+    label: "Ontime Expected Finish",
+    description: "Wall-clock time the current Ontime event is expected to end",
+    icon: <FlagRegular />,
+    color: "#f97316",
+    group: "ontime",
   },
 };
 
@@ -435,6 +506,30 @@ const useStyles = makeStyles({
     ...shorthands.borderRadius(tokens.borderRadiusMedium),
     boxShadow: tokens.shadow16,
     ...shorthands.padding(tokens.spacingVerticalS),
+    maxHeight: "calc(100vh - 32px)",
+  },
+  paletteScroll: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: tokens.spacingVerticalS,
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    scrollbarWidth: "thin",
+    scrollbarColor: `${tokens.colorNeutralStroke2} transparent`,
+    "&::-webkit-scrollbar": {
+      width: "8px",
+    },
+    "&::-webkit-scrollbar-track": {
+      backgroundColor: "transparent",
+    },
+    "&::-webkit-scrollbar-thumb": {
+      backgroundColor: tokens.colorNeutralStroke2,
+      borderRadius: "4px",
+    },
+    "&::-webkit-scrollbar-thumb:hover": {
+      backgroundColor: tokens.colorNeutralStroke1,
+    },
   },
   dockHandle: {
     display: "flex",
@@ -453,6 +548,7 @@ const useStyles = makeStyles({
     display: "flex",
     flexDirection: "column",
     rowGap: tokens.spacingVerticalXS,
+    minWidth: 0,
   },
   dockMeta: {
     color: tokens.colorNeutralForeground3,
@@ -972,6 +1068,11 @@ function App() {
     currentTime: 0,
     totalTime: 0,
     remainingTime: 0,
+    ontimeCurrent: 0,
+    ontimeTitle: "",
+    ontimePlayback: "",
+    ontimeOnAir: false,
+    ontimeExpectedFinish: 0,
     loop: false,
     stopped: false,
     elapsedColor: "",
@@ -1150,6 +1251,11 @@ function App() {
         currentTime: 0,
         totalTime: 0,
         remainingTime: 0,
+        ontimeCurrent: 0,
+        ontimeTitle: "",
+        ontimePlayback: "",
+        ontimeOnAir: false,
+        ontimeExpectedFinish: 0,
         loop: false,
         stopped: false,
         elapsedColor: "",
@@ -1272,7 +1378,7 @@ function App() {
         const delta = event.clientX - dockResizeRef.current.startX;
         setDockState((prev) => ({
           ...prev,
-          width: Math.max(220, dockResizeRef.current!.startWidth + delta),
+          width: Math.max(240, dockResizeRef.current!.startWidth + delta),
         }));
       }
     };
@@ -1811,6 +1917,172 @@ function App() {
       );
     }
 
+    if (node.widgetKey === "ontimeTimer") {
+      const value = state.ontimeCurrent || 0;
+      const overtime = value < 0;
+      const display = Utils.msToTime(value);
+      return (
+        <div
+          className="monitor"
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || "Ontime"}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{
+              color: colors.faceColor ?? (overtime ? "red" : state.clockColor),
+            }}
+          >
+            {display}
+          </div>
+        </div>
+      );
+    }
+
+    if (node.widgetKey === "ontimeTitle") {
+      return (
+        <div
+          className="monitor"
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || "Now"}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{
+              color: colors.faceColor ?? state.clockColor,
+              fontFamily: "inherit",
+              fontSize: "min(8cqw, 18cqh)",
+              padding: "0 4cqw",
+            }}
+          >
+            {state.ontimeTitle || "—"}
+          </div>
+        </div>
+      );
+    }
+
+    if (node.widgetKey === "ontimePlayback") {
+      const playback = (state.ontimePlayback || "").toLowerCase();
+      const playbackIcon = (() => {
+        switch (playback) {
+          case "play":
+          case "playing":
+          case "roll":
+            return <PlayRegular />;
+          case "pause":
+          case "paused":
+            return <PauseRegular />;
+          case "stop":
+          case "stopped":
+            return <StopRegular />;
+          case "armed":
+            return <RecordRegular />;
+          default:
+            return <ProhibitedRegular />;
+        }
+      })();
+      const playbackLabel =
+        playback ? playback.charAt(0).toUpperCase() + playback.slice(1) : "—";
+      const playbackColor = (() => {
+        if (playback === "play" || playback === "playing" || playback === "roll")
+          return "#22c55e";
+        if (playback === "armed") return "#dc2626";
+        if (playback === "pause" || playback === "paused") return "#f59e0b";
+        return "#888";
+      })();
+      return (
+        <div
+          className="monitor"
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || playbackLabel}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{ color: colors.faceColor ?? playbackColor }}
+            aria-label={`Playback: ${playbackLabel}`}
+            title={`Playback: ${playbackLabel}`}
+          >
+            {playbackIcon}
+          </div>
+        </div>
+      );
+    }
+
+    if (node.widgetKey === "ontimeOnAir") {
+      const onAir = state.ontimeOnAir;
+      return (
+        <div
+          className={`monitor${onAir ? " ending" : ""}`}
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || (onAir ? "ON AIR" : "OFF AIR")}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{
+              color: colors.faceColor ?? (onAir ? "#dc2626" : "#555"),
+              fontFamily: "inherit",
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              fontSize: "min(14cqw, 35cqh)",
+            }}
+            aria-label={onAir ? "On air" : "Off air"}
+          >
+            {onAir ? "● LIVE" : "OFF"}
+          </div>
+        </div>
+      );
+    }
+
+    if (node.widgetKey === "ontimeExpectedFinish") {
+      const ms = state.ontimeExpectedFinish || 0;
+      // Ontime sends an absolute "ms-from-midnight" value; render as wall-clock
+      const display = ms > 0 ? Utils.msToTime(ms) : "--:--:--";
+      return (
+        <div
+          className="monitor"
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || "Expected finish"}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{ color: colors.faceColor ?? state.clockColor }}
+          >
+            {display}
+          </div>
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -2054,8 +2326,10 @@ function App() {
       </div>
 
       <div className={styles.dockSection}>
-        <Field label="Layout">
+        <Field label="Layout" style={{ minWidth: 0 }}>
           <Dropdown
+            style={{ minWidth: 0, width: "100%" }}
+            listbox={{ style: { minWidth: 0 } }}
             value={selectedLayout?.name ?? ""}
             selectedOptions={selectedLayout ? [selectedLayout.id] : []}
             onOptionSelect={(_e, data) => {
@@ -2114,37 +2388,51 @@ function App() {
         Delete layout
       </Button>
 
-      <Caption1 className={styles.paletteHeading}>Add widget</Caption1>
-      <div className={styles.dockButtonRowSingle}>
-        {Object.values(widgetCatalog).map((widget) => (
-          <Draggable
-            key={widget.key}
-            id={`palette:${widget.key}`}
-            data={{
-              kind: "palette",
-              widgetKey: widget.key,
-              label: widget.label,
-            }}
-          >
-            <Tooltip
-              content={`${widget.description} — click or drag onto a widget edge`}
-              relationship="description"
-              withArrow
-            >
-              <Button
-                appearance="secondary"
-                icon={
-                  <span style={{ color: widget.color, display: "inline-flex" }}>
-                    {widget.icon}
-                  </span>
-                }
-                onClick={() => handleAddWidget(widget.key)}
-              >
-                {widget.label}
-              </Button>
-            </Tooltip>
-          </Draggable>
-        ))}
+      <div className={styles.paletteScroll}>
+        {WIDGET_GROUPS.map((group) => {
+          const widgets = Object.values(widgetCatalog).filter(
+            (w) => w.group === group.id
+          );
+          if (!widgets.length) return null;
+          return (
+            <React.Fragment key={group.id}>
+              <Caption1 className={styles.paletteHeading}>{group.label}</Caption1>
+              <div className={styles.dockButtonRowSingle}>
+                {widgets.map((widget) => (
+                  <Draggable
+                    key={widget.key}
+                    id={`palette:${widget.key}`}
+                    data={{
+                      kind: "palette",
+                      widgetKey: widget.key,
+                      label: widget.label,
+                    }}
+                  >
+                    <Tooltip
+                      content={`${widget.description} — click or drag onto a widget edge`}
+                      relationship="description"
+                      withArrow
+                    >
+                      <Button
+                        appearance="secondary"
+                        icon={
+                          <span
+                            style={{ color: widget.color, display: "inline-flex" }}
+                          >
+                            {widget.icon}
+                          </span>
+                        }
+                        onClick={() => handleAddWidget(widget.key)}
+                      >
+                        {widget.label}
+                      </Button>
+                    </Tooltip>
+                  </Draggable>
+                ))}
+              </div>
+            </React.Fragment>
+          );
+        })}
       </div>
 
       <div className={styles.dockResize} onMouseDown={handleDockResizeStart} />

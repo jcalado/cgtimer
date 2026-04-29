@@ -8,6 +8,11 @@ class oscListener {
   currentTime: number;
   remainingTime: number;
   totalTime: number;
+  ontimeCurrent: number;
+  ontimeTitle: string;
+  ontimePlayback: string;
+  ontimeOnAir: boolean;
+  ontimeExpectedFinish: number;
   loop: boolean;
   stopped: boolean;
   udpPort: UDPPort | undefined;
@@ -21,6 +26,11 @@ class oscListener {
     this.currentTime = 0;
     this.remainingTime = 0;
     this.totalTime = 0;
+    this.ontimeCurrent = 0;
+    this.ontimeTitle = "";
+    this.ontimePlayback = "";
+    this.ontimeOnAir = false;
+    this.ontimeExpectedFinish = 0;
     this.loop = false;
     this.stopped = false;
     this.udpPort = undefined;
@@ -63,6 +73,10 @@ class oscListener {
         this.parseCCGMessage(message);
       }
 
+      if (message["address"].startsWith("/from-ontime/")) {
+        this.parseOntimeMessage(message);
+      }
+
     });
 
     this.udpPort.open();
@@ -98,7 +112,36 @@ class oscListener {
       }
   }
 
-private parseTimerCommand = (message: OSCMessage) => {
+  private parseOntimeMessage = (message: OSCMessage) => {
+    const args = message["args"];
+    const address = message["address"];
+    const raw = args?.[0]?.["value"];
+    const isNullish = raw === "null" || raw == null;
+
+    if (address.startsWith("/from-ontime/current")) {
+      this.ontimeCurrent = isNullish ? 0 : Number(raw);
+      return;
+    }
+    if (address.startsWith("/from-ontime/expectedFinish")) {
+      this.ontimeExpectedFinish = isNullish ? 0 : Number(raw);
+      return;
+    }
+    if (address.startsWith("/from-ontime/title")) {
+      this.ontimeTitle = isNullish ? "" : String(raw);
+      return;
+    }
+    if (address.startsWith("/from-ontime/playback")) {
+      this.ontimePlayback = isNullish ? "" : String(raw);
+      return;
+    }
+    if (address.startsWith("/from-ontime/onAir")) {
+      // Ontime sends booleans as 0/1 or true/false depending on version
+      this.ontimeOnAir = raw === true || raw === 1 || raw === "1" || raw === "true";
+      return;
+    }
+  };
+
+  private parseTimerCommand = (message: OSCMessage) => {
     if (!this.onTimerCommand) return;
 
     // Parse /timer/{name}/{action} format
