@@ -75,6 +75,8 @@ import {
 } from "@fluentui/react-icons";
 import { Utils } from "../utils";
 import { MonitorWidget } from "./components/MonitorWidget";
+import { ConfigRow } from "./components/ConfigRow";
+import { ColorSwatchInput } from "./components/ColorSwatchInput";
 
 type WidgetKind =
   | "worldClock"
@@ -772,26 +774,11 @@ const useStyles = makeStyles({
     rowGap: tokens.spacingVerticalS,
     minWidth: "260px",
   },
-  configRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    columnGap: tokens.spacingHorizontalM,
-  },
   configFooter: {
     display: "flex",
     justifyContent: "space-between",
     columnGap: tokens.spacingHorizontalS,
     paddingTop: tokens.spacingVerticalXS,
-  },
-  colorSwatchInput: {
-    width: "36px",
-    height: "28px",
-    ...shorthands.padding("0"),
-    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke1),
-    ...shorthands.borderRadius(tokens.borderRadiusSmall),
-    backgroundColor: tokens.colorNeutralBackground1,
-    cursor: "pointer",
   },
   fullscreenButton: {
     position: "absolute",
@@ -937,12 +924,6 @@ const ColorConfigPanel = ({ node, onChange, onClose }: ColorConfigPanelProps) =>
   const showLabel = node.settings?.showLabel !== false;
   const customLabel = node.settings?.customLabel ?? "";
 
-  const handleColorChange =
-    (key: "labelColor" | "faceColor" | "backgroundColor") =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onChange({ [key]: e.target.value || undefined });
-    };
-
   const handleReset = () => {
     onChange({
       labelColor: undefined,
@@ -957,16 +938,14 @@ const ColorConfigPanel = ({ node, onChange, onClose }: ColorConfigPanelProps) =>
     <div className={styles.configPopover}>
       <Body1Strong>Widget settings</Body1Strong>
 
-      <div className={styles.configRow}>
-        <Caption1>Show label</Caption1>
+      <ConfigRow label="Show label">
         <Switch
           checked={showLabel}
           onChange={(_e, data) => onChange({ showLabel: data.checked })}
         />
-      </div>
+      </ConfigRow>
 
-      <div className={styles.configRow}>
-        <Caption1>Custom label</Caption1>
+      <ConfigRow label="Custom label">
         <Input
           size="small"
           value={customLabel}
@@ -976,38 +955,32 @@ const ColorConfigPanel = ({ node, onChange, onClose }: ColorConfigPanelProps) =>
             onChange({ customLabel: data.value || undefined })
           }
         />
-      </div>
+      </ConfigRow>
 
-      <div className={styles.configRow}>
-        <Caption1>Label color</Caption1>
-        <input
-          type="color"
-          className={styles.colorSwatchInput}
-          value={colors.labelColor ?? "#aaaaaa"}
-          onChange={handleColorChange("labelColor")}
+      <ConfigRow label="Label color">
+        <ColorSwatchInput
+          value={colors.labelColor}
+          defaultValue="#aaaaaa"
+          onChange={(value) => onChange({ labelColor: value })}
           disabled={!showLabel}
         />
-      </div>
+      </ConfigRow>
 
-      <div className={styles.configRow}>
-        <Caption1>Foreground</Caption1>
-        <input
-          type="color"
-          className={styles.colorSwatchInput}
-          value={colors.faceColor ?? "#e5e9ff"}
-          onChange={handleColorChange("faceColor")}
+      <ConfigRow label="Foreground">
+        <ColorSwatchInput
+          value={colors.faceColor}
+          defaultValue="#e5e9ff"
+          onChange={(value) => onChange({ faceColor: value })}
         />
-      </div>
+      </ConfigRow>
 
-      <div className={styles.configRow}>
-        <Caption1>Background</Caption1>
-        <input
-          type="color"
-          className={styles.colorSwatchInput}
-          value={colors.backgroundColor ?? "#242424"}
-          onChange={handleColorChange("backgroundColor")}
+      <ConfigRow label="Background">
+        <ColorSwatchInput
+          value={colors.backgroundColor}
+          defaultValue="#242424"
+          onChange={(value) => onChange({ backgroundColor: value })}
         />
-      </div>
+      </ConfigRow>
 
       <div className={styles.configFooter}>
         <Button appearance="subtle" onClick={handleReset}>

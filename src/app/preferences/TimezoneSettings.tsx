@@ -1,28 +1,20 @@
 import React, { useState } from "react";
 import {
   Button,
-  Dialog,
-  DialogTrigger,
-  DialogSurface,
-  DialogTitle,
-  DialogBody,
-  DialogActions,
-  DialogContent,
   Input,
   Label,
   Switch,
   makeStyles,
-  tokens,
-  Table,
-  TableHeader,
   TableRow,
-  TableHeaderCell,
-  TableBody,
   TableCell,
   Dropdown,
   Option,
 } from "@fluentui/react-components";
-import { Add24Regular, Delete24Regular } from "@fluentui/react-icons";
+import { Delete24Regular } from "@fluentui/react-icons";
+import {
+  SettingsList,
+  useSettingsListStyles,
+} from "../components/SettingsList";
 
 interface TimezoneClock {
   id: string;
@@ -37,26 +29,7 @@ interface TimezoneSettingsProps {
   onChange: (clocks: TimezoneClock[]) => void;
 }
 
-const useStyles = makeStyles({
-  container: {
-    display: "flex",
-    flexDirection: "column",
-    gap: tokens.spacingVerticalL,
-    padding: tokens.spacingVerticalXL,
-  },
-  toolbar: {
-    display: "flex",
-    justifyContent: "flex-end",
-  },
-  table: {
-    backgroundColor: tokens.colorNeutralBackground1,
-  },
-  dialogField: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    marginBottom: "16px",
-  },
+const useTimezoneStyles = makeStyles({
   timePreview: {
     fontFamily: "led",
     fontSize: "56px",
@@ -66,11 +39,6 @@ const useStyles = makeStyles({
     padding: "20px 16px",
     backgroundColor: "#242424",
     borderRadius: "8px",
-  },
-  emptyState: {
-    textAlign: "center",
-    padding: "32px",
-    color: tokens.colorNeutralForeground3,
   },
 });
 
@@ -166,7 +134,8 @@ export const TimezoneSettings: React.FC<TimezoneSettingsProps> = ({
   clockColor,
   onChange,
 }) => {
-  const styles = useStyles();
+  const styles = useSettingsListStyles();
+  const tzStyles = useTimezoneStyles();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newTimezone, setNewTimezone] = useState(COMMON_TIMEZONES[0]?.value || "Europe/London");
@@ -223,105 +192,71 @@ export const TimezoneSettings: React.FC<TimezoneSettingsProps> = ({
   }, [dialogOpen, newTimezone]);
 
   return (
-    <div className={styles.container}>
-      <Dialog open={dialogOpen} onOpenChange={(_, data) => setDialogOpen(data.open)}>
-        <div className={styles.toolbar}>
-          <DialogTrigger disableButtonEnhancement>
-            <Button appearance="primary" icon={<Add24Regular />}>
-              Add
-            </Button>
-          </DialogTrigger>
-        </div>
-        <DialogSurface>
-          <DialogBody>
-            <DialogTitle>Add Timezone Clock</DialogTitle>
-            <DialogContent>
-              <div className={styles.dialogField}>
-                <Label htmlFor="clock-label">Clock Label</Label>
-                <Input
-                  id="clock-label"
-                  value={newLabel}
-                  onChange={(_, data) => setNewLabel(data.value)}
-                  placeholder="e.g., New York, London"
-                />
-              </div>
+    <SettingsList
+      items={clocks}
+      columns={["Label", "Timezone", "Enabled", "Actions"]}
+      emptyTitle="No timezones configured."
+      emptyHint="Click Add to get started."
+      dialogOpen={dialogOpen}
+      onDialogOpenChange={setDialogOpen}
+      dialogTitle="Add Timezone Clock"
+      canAdd={!!newLabel.trim()}
+      onAdd={handleAdd}
+      dialogContent={
+        <>
+          <div className={styles.dialogField}>
+            <Label htmlFor="clock-label">Clock Label</Label>
+            <Input
+              id="clock-label"
+              value={newLabel}
+              onChange={(_, data) => setNewLabel(data.value)}
+              placeholder="e.g., New York, London"
+            />
+          </div>
 
-              <div className={styles.dialogField}>
-                <Label htmlFor="timezone">Timezone</Label>
-                <Dropdown
-                  id="timezone"
-                  value={COMMON_TIMEZONES.find(tz => tz.value === newTimezone)?.label || ""}
-                  onOptionSelect={(_, data) => handleTimezoneChange(data.optionValue as string)}
-                  style={{ width: "100%" }}
-                >
-                  {COMMON_TIMEZONES.map((tz) => (
-                    <Option key={tz.value} value={tz.value}>
-                      {tz.label}
-                    </Option>
-                  ))}
-                </Dropdown>
-              </div>
+          <div className={styles.dialogField}>
+            <Label htmlFor="timezone">Timezone</Label>
+            <Dropdown
+              id="timezone"
+              value={COMMON_TIMEZONES.find((tz) => tz.value === newTimezone)?.label || ""}
+              onOptionSelect={(_, data) => handleTimezoneChange(data.optionValue as string)}
+              style={{ width: "100%" }}
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <Option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </Option>
+              ))}
+            </Dropdown>
+          </div>
 
-              <div className={styles.dialogField}>
-                <Label>Current Time in This Timezone</Label>
-                <div className={styles.timePreview} style={{ color: clockColor }}>
-                  {previewTime}
-                </div>
-              </div>
-            </DialogContent>
-            <DialogActions>
-              <DialogTrigger disableButtonEnhancement>
-                <Button appearance="secondary">Cancel</Button>
-              </DialogTrigger>
-              <Button
-                appearance="primary"
-                onClick={handleAdd}
-                disabled={!newLabel.trim()}
-              >
-                Add
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
-
-      {clocks.length === 0 ? (
-        <div className={styles.emptyState}>
-          No timezones configured. Click Add to get started.
-        </div>
-      ) : (
-        <Table className={styles.table}>
-          <TableHeader>
-            <TableRow>
-              <TableHeaderCell>Label</TableHeaderCell>
-              <TableHeaderCell>Timezone</TableHeaderCell>
-              <TableHeaderCell>Enabled</TableHeaderCell>
-              <TableHeaderCell>Actions</TableHeaderCell>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {clocks.map((clock) => (
-              <TableRow key={clock.id}>
-                <TableCell>{clock.label}</TableCell>
-                <TableCell>{clock.timezone}</TableCell>
-                <TableCell>
-                  <Switch
-                    checked={clock.enabled}
-                    onChange={(_, data) => handleToggle(clock.id, data.checked)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Button
-                    appearance="subtle"
-                    icon={<Delete24Regular />}
-                    onClick={() => handleDelete(clock.id)}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+          <div className={styles.dialogField}>
+            <Label>Current Time in This Timezone</Label>
+            <div className={tzStyles.timePreview} style={{ color: clockColor }}>
+              {previewTime}
+            </div>
+          </div>
+        </>
+      }
+      renderRow={(clock) => (
+        <TableRow key={clock.id}>
+          <TableCell>{clock.label}</TableCell>
+          <TableCell>{clock.timezone}</TableCell>
+          <TableCell>
+            <Switch
+              checked={clock.enabled}
+              onChange={(_, data) => handleToggle(clock.id, data.checked)}
+            />
+          </TableCell>
+          <TableCell>
+            <Button
+              appearance="subtle"
+              icon={<Delete24Regular />}
+              onClick={() => handleDelete(clock.id)}
+            />
+          </TableCell>
+        </TableRow>
       )}
-    </div>
+    />
   );
 };
