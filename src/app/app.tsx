@@ -43,6 +43,7 @@ import {
 import {
   AddRegular,
   ArrowRepeatAllRegular,
+  CalendarClockRegular,
   ClockRegular,
   ColorRegular,
   CopyRegular,
@@ -58,21 +59,19 @@ import {
   HourglassRegular,
   ProhibitedRegular,
   PulseRegular,
-  RecordRegular,
   ReOrderRegular,
   RenameRegular,
   SaveRegular,
   SplitHorizontalRegular,
   SplitVerticalRegular,
 } from "@fluentui/react-icons";
-import { Utils } from "../utils";
 
 type WidgetKind =
   | "worldClock"
   | "localClock"
   | "primaryTimer"
   | "secondaryTimer"
-  | "productionTimer"
+  | "timeOfDayCountdown"
   | "loopState"
   | "oscTimer";
 
@@ -84,6 +83,7 @@ type WidgetSettings = {
   showLabel?: boolean;
   customLabel?: string;
   oscTimerName?: string;
+  targetTime?: string; // HH:MM:SS for timeOfDayCountdown
 };
 
 type WidgetDefinition = {
@@ -155,11 +155,11 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     icon: <HistoryRegular />,
     color: "#22c55e",
   },
-  productionTimer: {
-    key: "productionTimer",
-    label: "Production Timer",
-    description: "Displays production runtime or on-time if enabled",
-    icon: <RecordRegular />,
+  timeOfDayCountdown: {
+    key: "timeOfDayCountdown",
+    label: "Time-of-day Countdown",
+    description: "Counts down to a target wall-clock time",
+    icon: <CalendarClockRegular />,
     color: "#ef4444",
   },
   loopState: {
@@ -974,15 +974,9 @@ function App() {
     remainingTime: 0,
     loop: false,
     stopped: false,
-    enableProductionClock: false,
-    enableOntime: false,
-    ontimeCurrent: 0,
     elapsedColor: "",
     remainingColor: "",
     clockColor: "",
-    productionColor: "",
-    startTime: 0,
-    runtime: 0,
     timezoneClocks: [] as Array<{
       id: string;
       label: string;
@@ -1158,15 +1152,9 @@ function App() {
         remainingTime: 0,
         loop: false,
         stopped: false,
-        startTime: 0,
-        runtime: 0,
-        enableProductionClock: false,
-        enableOntime: false,
-        ontimeCurrent: 0,
         elapsedColor: "",
         remainingColor: "",
         clockColor: "",
-        productionColor: "",
         timezoneClocks: [],
       });
     };
@@ -1408,6 +1396,9 @@ function App() {
     if (widgetKey === "oscTimer") {
       return { oscTimerName: `timer${generateId().slice(0, 4)}` };
     }
+    if (widgetKey === "timeOfDayCountdown") {
+      return { targetTime: "20:00:00" };
+    }
     return undefined;
   };
 
@@ -1639,12 +1630,28 @@ function App() {
       );
     }
 
-    if (node.widgetKey === "productionTimer") {
-      const productionValue = state.enableProductionClock
-        ? state.enableOntime
-          ? Utils.msToTime(state.ontimeCurrent)
-          : state.runtime
-        : "--:--:--";
+    if (node.widgetKey === "timeOfDayCountdown") {
+      const target = node.settings?.targetTime || "20:00:00";
+      const match = /^(\d{2}):(\d{2}):(\d{2})$/.exec(target);
+      let display = "--:--:--";
+      let overdue = false;
+      if (match) {
+        const targetDate = new Date(now);
+        targetDate.setHours(
+          parseInt(match[1], 10),
+          parseInt(match[2], 10),
+          parseInt(match[3], 10),
+          0
+        );
+        const diffMs = targetDate.getTime() - now;
+        overdue = diffMs < 0;
+        const absSeconds = Math.floor(Math.abs(diffMs) / 1000);
+        const hh = String(Math.floor(absSeconds / 3600)).padStart(2, "0");
+        const mm = String(Math.floor((absSeconds % 3600) / 60)).padStart(2, "0");
+        const ss = String(absSeconds % 60).padStart(2, "0");
+        display = `${overdue ? "+" : ""}${hh}:${mm}:${ss}`;
+      }
+
       return (
         <div
           className="monitor"
@@ -1652,16 +1659,32 @@ function App() {
             colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
           }
         >
+          {isEditing && (
+            <div className={styles.widgetControl}>
+              <Input
+                size="small"
+                value={target}
+                placeholder="HH:MM:SS"
+                onChange={(_e, data) =>
+                  handleUpdateWidgetSettings(node.id, {
+                    targetTime: data.value || undefined,
+                  })
+                }
+              />
+            </div>
+          )}
           {showLabel && (
             <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || "Production"}
+              {customLabel || `Until ${target}`}
             </h1>
           )}
           <div
             className="clock-face"
-            style={{ color: colors.faceColor ?? state.productionColor }}
+            style={{
+              color: colors.faceColor ?? (overdue ? "red" : state.clockColor),
+            }}
           >
-            {productionValue}
+            {display}
           </div>
         </div>
       );

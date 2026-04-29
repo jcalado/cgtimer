@@ -15,15 +15,8 @@ export interface StoreSchema {
     displayY: number;
     fullscreen: boolean;
   };
-  production: {
-    enable: boolean;
-    start: string;
-    runtime: string;
-    ontime: boolean;
-  };
   colors: {
     clock: string;
-    production: string;
     elapsed: string;
     remaining: string;
   };
@@ -79,38 +72,10 @@ const schema: Schema<StoreSchema> = {
       },
     },
   },
-  production: {
-    type: "object",
-    properties: {
-      enable: {
-        type: "boolean",
-        default: false,
-      },
-      start: {
-        type: "string",
-        default: "00:10:00",
-        pattern: "^\\d{2}:\\d{2}:\\d{2}$",
-      },
-      runtime: {
-        type: "string",
-        default: "00:20:00",
-        pattern: "^\\d{2}:\\d{2}:\\d{2}$",
-      },
-      ontime: {
-        type: "boolean",
-        default: false,
-      },
-    },
-  },
   colors: {
     type: "object",
     properties: {
       clock: {
-        type: "string",
-        default: "#960000",
-        pattern: "^#[0-9A-Fa-f]{6}$",
-      },
-      production: {
         type: "string",
         default: "#960000",
         pattern: "^#[0-9A-Fa-f]{6}$",
@@ -161,15 +126,8 @@ const defaults: StoreSchema = {
     displayY: 0,
     fullscreen: false,
   },
-  production: {
-    enable: false,
-    start: "00:10:00",
-    runtime: "00:20:00",
-    ontime: false,
-  },
   colors: {
     clock: "#960000",
-    production: "#960000",
     elapsed: "#00FF00",
     remaining: "#FF0000",
   },

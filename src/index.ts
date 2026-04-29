@@ -6,12 +6,6 @@ import oscListener from "./osc";
 import store from "./store";
 import type { StoreSchema } from "./store";
 
-import {
-  add,
-  differenceInMilliseconds,
-  isPast,
-  parse,
-} from "date-fns";
 
 // In development, electron-vite sets ELECTRON_RENDERER_URL environment variable
 // In production, we load from the out/renderer directory
@@ -248,51 +242,12 @@ const createWindow = (): void => {
       remainingTime: osc.remainingTime,
       loop: osc.loop,
       stopped: osc.stopped,
-      enableProductionClock: store.get("production.enable"),
-      enableOntime: store.get("production.ontime"),
-      ontimeCurrent: osc.ontimeCurrent,
       elapsedColor: store.get("colors.elapsed"),
       remainingColor: store.get("colors.remaining"),
       clockColor: store.get("colors.clock"),
-      productionColor: store.get("colors.production"),
-      startTime: store.get("production.start"),
-      runtime: runtimeClock(
-        store.get("production.start"),
-        store.get("production.runtime")
-      ),
       timezoneClocks: store.get("timezones.clocks") || [],
     });
   }, 200);
-};
-
-const runtimeClock = (startTime: string, runtime: string) => {
-
-  if (!startTime || !runtime) {
-    return "00:00:00";
-  }
-
-  const timeFormat = /^(\d{2}:\d{2}:\d{2})$/;
-
-  if (!timeFormat.test(startTime) || !timeFormat.test(runtime)) {
-    return "00:00:00";
-  }
-
-  const runtimeDate = parse(runtime, "HH:mm:ss", new Date());
-  const startDate = parse(startTime, "HH:mm:ss", new Date());
-  const endDate = add(startDate, {
-    hours: runtimeDate.getHours(),
-    minutes: runtimeDate.getMinutes(),
-    seconds: runtimeDate.getSeconds(),
-  });
-
-  if (isPast(startDate)) {
-    const diff = differenceInMilliseconds(endDate, new Date());
-    return new Date(diff).toISOString().substr(11, 8);
-  } else {
-    const diff = differenceInMilliseconds(startDate, new Date());
-
-    return new Date(diff).toISOString().substr(11, 8);
-  }
 };
 
 // IPC handlers for settings
@@ -300,7 +255,6 @@ ipcMain.handle("settings:get", (): StoreSchema => {
   return {
     server: store.get("server"),
     application: store.get("application"),
-    production: store.get("production"),
     colors: store.get("colors"),
     timezones: store.get("timezones"),
   };
@@ -309,7 +263,6 @@ ipcMain.handle("settings:get", (): StoreSchema => {
 ipcMain.handle("settings:save", (_, settings: StoreSchema) => {
   store.set("server", settings.server);
   store.set("application", settings.application);
-  store.set("production", settings.production);
   store.set("colors", settings.colors);
   store.set("timezones", settings.timezones);
 
@@ -334,7 +287,6 @@ ipcMain.handle("settings:reset", (): StoreSchema => {
   return {
     server: store.get("server"),
     application: store.get("application"),
-    production: store.get("production"),
     colors: store.get("colors"),
     timezones: store.get("timezones"),
   };

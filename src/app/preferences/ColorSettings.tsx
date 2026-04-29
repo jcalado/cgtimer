@@ -53,11 +53,9 @@ const useStyles = makeStyles({
 
 interface ColorSettingsProps {
   clock: string;
-  production: string;
   elapsed: string;
   remaining: string;
   onClockChange: (value: string) => void;
-  onProductionChange: (value: string) => void;
   onElapsedChange: (value: string) => void;
   onRemainingChange: (value: string) => void;
 }
@@ -72,11 +70,9 @@ type RowProps = {
 
 export const ColorSettings: React.FC<ColorSettingsProps> = ({
   clock,
-  production,
   elapsed,
   remaining,
   onClockChange,
-  onProductionChange,
   onElapsedChange,
   onRemainingChange,
 }) => {
@@ -109,13 +105,6 @@ export const ColorSettings: React.FC<ColorSettingsProps> = ({
         hint="Color for the main clock display"
         value={clock}
         onChange={onClockChange}
-      />
-      <Row
-        id="productionColor"
-        label="Production color"
-        hint="Color for the production clock display"
-        value={production}
-        onChange={onProductionChange}
       />
       <Row
         id="elapsedColor"

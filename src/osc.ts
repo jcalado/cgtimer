@@ -8,7 +8,6 @@ class oscListener {
   currentTime: number;
   remainingTime: number;
   totalTime: number;
-  ontimeCurrent: number;
   loop: boolean;
   stopped: boolean;
   udpPort: UDPPort | undefined;
@@ -22,7 +21,6 @@ class oscListener {
     this.currentTime = 0;
     this.remainingTime = 0;
     this.totalTime = 0;
-    this.ontimeCurrent = 0;
     this.loop = false;
     this.stopped = false;
     this.udpPort = undefined;
@@ -65,10 +63,6 @@ class oscListener {
         this.parseCCGMessage(message);
       }
 
-      if (message["address"].startsWith("/from-ontime/")) {
-        this.parseOntimeMessage(message);
-      }
-
     });
 
     this.udpPort.open();
@@ -104,23 +98,7 @@ class oscListener {
       }
   }
 
-  private parseOntimeMessage = (message: OSCMessage) => {
-    const args = message["args"];
-
-    if (message["address"].startsWith("/from-ontime/current")) {
-      if (args[0]["value"] == "null") {
-        this.ontimeCurrent = 0;
-      } else {
-        this.ontimeCurrent = args[0]["value"];
-      }
-    }
-
-    // if (message["address"].startsWith("/from-ontime/expectedFinish")) {
-    //   console.log(Utils.msToTime(args[0]["value"]));
-    // }
-  }
-
-  private parseTimerCommand = (message: OSCMessage) => {
+private parseTimerCommand = (message: OSCMessage) => {
     if (!this.onTimerCommand) return;
 
     // Parse /timer/{name}/{action} format

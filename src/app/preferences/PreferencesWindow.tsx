@@ -17,7 +17,6 @@ import {
 } from "@fluentui/react-icons";
 import { ServerSettings } from "./ServerSettings";
 import { ApplicationSettings } from "./ApplicationSettings";
-import { ProductionSettings } from "./ProductionSettings";
 import { ColorSettings } from "./ColorSettings";
 import { TimezoneSettings } from "./TimezoneSettings";
 import type { StoreSchema } from "../../store";
@@ -67,12 +66,11 @@ const useStyles = makeStyles({
   },
 });
 
-type TabValue = "server" | "application" | "production" | "colors" | "timezones";
+type TabValue = "server" | "application" | "colors" | "timezones";
 
 const TAB_VALUES: TabValue[] = [
   "server",
   "application",
-  "production",
   "colors",
   "timezones",
 ];
@@ -109,19 +107,20 @@ export const PreferencesWindow: React.FC = () => {
       // Ensure settings have all required sections with defaults
       setSettings({
         server: loadedSettings?.server || { port: 6251, channel: 1 },
-        application: loadedSettings?.application || { display: 0, fullscreen: false },
-        production: loadedSettings?.production || { enable: false, start: "00:10:00", runtime: "00:20:00", ontime: false },
-        colors: loadedSettings?.colors || { clock: "#960000", production: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
+        application:
+          loadedSettings?.application ||
+          { display: 0, displayLabel: "", displayX: 0, displayY: 0, fullscreen: false },
+        colors:
+          loadedSettings?.colors ||
+          { clock: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
         timezones: loadedSettings?.timezones || { clocks: [] },
       });
     }).catch((error) => {
       console.error("Error loading settings:", error);
-      // Set defaults on error
       setSettings({
         server: { port: 6251, channel: 1 },
-        application: { display: 0, fullscreen: false },
-        production: { enable: false, start: "00:10:00", runtime: "00:20:00", ontime: false },
-        colors: { clock: "#960000", production: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
+        application: { display: 0, displayLabel: "", displayX: 0, displayY: 0, fullscreen: false },
+        colors: { clock: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
         timezones: { clocks: [] },
       });
     });
@@ -193,9 +192,6 @@ export const PreferencesWindow: React.FC = () => {
               <Tab value="application" icon={<AppGenericRegular />}>
                 Application
               </Tab>
-              <Tab value="production" icon={<ClockRegular />}>
-                Production
-              </Tab>
               <Tab value="colors" icon={<ColorRegular />}>
                 Colors
               </Tab>
@@ -230,38 +226,13 @@ export const PreferencesWindow: React.FC = () => {
               />
             )}
 
-            {selectedTab === "production" && (
-              <ProductionSettings
-                enable={settings.production.enable}
-                start={settings.production.start}
-                runtime={settings.production.runtime}
-                ontime={settings.production.ontime}
-                onEnableChange={(value) =>
-                  updateSetting("production", "enable", value)
-                }
-                onStartChange={(value) =>
-                  updateSetting("production", "start", value)
-                }
-                onRuntimeChange={(value) =>
-                  updateSetting("production", "runtime", value)
-                }
-                onOntimeChange={(value) =>
-                  updateSetting("production", "ontime", value)
-                }
-              />
-            )}
-
             {selectedTab === "colors" && (
               <ColorSettings
                 clock={settings.colors.clock}
-                production={settings.colors.production}
                 elapsed={settings.colors.elapsed}
                 remaining={settings.colors.remaining}
                 onClockChange={(value) =>
                   updateSetting("colors", "clock", value)
-                }
-                onProductionChange={(value) =>
-                  updateSetting("colors", "production", value)
                 }
                 onElapsedChange={(value) =>
                   updateSetting("colors", "elapsed", value)
