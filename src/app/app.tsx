@@ -13,6 +13,11 @@ import {
   Dropdown,
   Field,
   Input,
+  Menu,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   Option,
   Popover,
   PopoverSurface,
@@ -1136,10 +1141,10 @@ function App() {
 
   const handleSplitWidget = (
     widgetId: string,
-    direction: "horizontal" | "vertical"
+    direction: "horizontal" | "vertical",
+    widgetKey: WidgetKind
   ) => {
     setDraftRoot((prev) => {
-      const widgetKey = "localClock" as WidgetKind;
       const widget = makeWidget(widgetKey, buildDefaultSettings(widgetKey));
       return splitWidgetAt(prev, widgetId, direction, "after", widget);
     });
@@ -1499,28 +1504,58 @@ function App() {
             </div>
             {isEditing && (
               <div className={styles.widgetCardActions}>
-                <Tooltip
-                  content="Split right"
-                  relationship="label"
-                  withArrow
-                >
-                  <Button
-                    appearance="subtle"
-                    size="small"
-                    icon={<SplitVerticalRegular />}
-                    aria-label="Split right"
-                    onClick={() => handleSplitWidget(node.id, "horizontal")}
-                  />
-                </Tooltip>
-                <Tooltip content="Split down" relationship="label" withArrow>
-                  <Button
-                    appearance="subtle"
-                    size="small"
-                    icon={<SplitHorizontalRegular />}
-                    aria-label="Split down"
-                    onClick={() => handleSplitWidget(node.id, "vertical")}
-                  />
-                </Tooltip>
+                <Menu>
+                  <MenuTrigger disableButtonEnhancement>
+                    <Tooltip content="Split right" relationship="label" withArrow>
+                      <Button
+                        appearance="subtle"
+                        size="small"
+                        icon={<SplitVerticalRegular />}
+                        aria-label="Split right"
+                      />
+                    </Tooltip>
+                  </MenuTrigger>
+                  <MenuPopover>
+                    <MenuList>
+                      {Object.values(widgetCatalog).map((widget) => (
+                        <MenuItem
+                          key={widget.key}
+                          onClick={() =>
+                            handleSplitWidget(node.id, "horizontal", widget.key)
+                          }
+                        >
+                          {widget.label}
+                        </MenuItem>
+                      ))}
+                    </MenuList>
+                  </MenuPopover>
+                </Menu>
+                <Menu>
+                  <MenuTrigger disableButtonEnhancement>
+                    <Tooltip content="Split down" relationship="label" withArrow>
+                      <Button
+                        appearance="subtle"
+                        size="small"
+                        icon={<SplitHorizontalRegular />}
+                        aria-label="Split down"
+                      />
+                    </Tooltip>
+                  </MenuTrigger>
+                  <MenuPopover>
+                    <MenuList>
+                      {Object.values(widgetCatalog).map((widget) => (
+                        <MenuItem
+                          key={widget.key}
+                          onClick={() =>
+                            handleSplitWidget(node.id, "vertical", widget.key)
+                          }
+                        >
+                          {widget.label}
+                        </MenuItem>
+                      ))}
+                    </MenuList>
+                  </MenuPopover>
+                </Menu>
                 <Popover
                   open={configuringWidgetId === node.id}
                   onOpenChange={(_e, data) =>

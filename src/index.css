@@ -40,7 +40,7 @@ body {
   padding: 3cqh 0;
   display: flex;
   flex-direction: column;
-  container-type: inline-size;
+  container-type: size;
   overflow: hidden;
 }
 
@@ -66,7 +66,7 @@ body {
   font-weight: bold;
   line-height: 0.9;
   text-align: center;
-  font-size: min(19cqw, 40cqh);
+  font-size: min(20cqw, 70cqh);
 }
 
 .monitor.ending .clock-face {
