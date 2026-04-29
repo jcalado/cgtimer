@@ -40,14 +40,13 @@ class oscListener {
     this.start();
 
     // Listen for server port or channel changes
-    store.onDidChange("server.port", this.restart);
-    store.onDidChange("server.channel", this.restart);
+    store.onDidChange("server", this.restart);
   }
 
   public start = () => {
     this.udpPort = new osc.UDPPort({
       localAddress: "0.0.0.0",
-      localPort: store.get("server.port"),
+      localPort: store.get("server").port,
       metadata: true,
     });
 
@@ -83,7 +82,7 @@ class oscListener {
   };
 
   private parseCCGMessage = (message: OSCMessage) => {
-    const channel = store.get("server.channel");
+    const channel = store.get("server").channel;
     const address = message["address"];
       const args = message["args"];
       const isFromActiveChannel = new RegExp(`/channel/${channel}`).test(
@@ -99,8 +98,8 @@ class oscListener {
       // Packet contains playing file time
       if (isTimeMessage) {
         this.stopped = false;
-        this.currentTime = Math.round(args[0]["value"]);
-        this.totalTime = Math.round(args[1]["value"]);
+        this.currentTime = Math.round(Number(args[0]["value"]));
+        this.totalTime = Math.round(Number(args[1]["value"]));
         this.remainingTime = this.totalTime - this.currentTime;
         if (this.remainingTime < 0) {
           this.remainingTime = 0;
@@ -108,7 +107,7 @@ class oscListener {
       }
 
       if (isLoopMessage) {
-        this.loop = args[0]["value"];
+        this.loop = Boolean(args[0]["value"]);
       }
   }
 

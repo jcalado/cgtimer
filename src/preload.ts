@@ -6,7 +6,7 @@ import type { StoreSchema } from "./store";
 import type { DisplayInfo } from "./shared/entities";
 
 export const api = {
-    send: (channel: any, data: any) => {
+    send: (channel: any, data?: any) => {
         ipcRenderer.send(channel, data);
     },
     receive: (channel: any, handler: any) => {

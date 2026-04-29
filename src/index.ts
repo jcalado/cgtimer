@@ -20,7 +20,7 @@ let layoutShortcuts: string[] = [];
 const hyperdeckClients = new Map<string, HyperDeckClient>();
 
 const reconcileHyperDecks = () => {
-  const desired = (store.get("recorders.hyperdecks") || []).filter(
+  const desired = (store.get("recorders").hyperdecks || []).filter(
     (r) => r.enabled && r.host && r.port
   );
   const desiredById = new Map(desired.map((r) => [r.id, r]));

@@ -358,7 +358,7 @@ const useStyles = makeStyles({
   },
   rootDropZoneActive: {
     backgroundColor: tokens.colorBrandBackground2,
-    borderColor: tokens.colorBrandStroke1,
+    ...shorthands.borderColor(tokens.colorBrandStroke1),
     color: tokens.colorBrandForeground1,
   },
   dragOverlayChip: {
