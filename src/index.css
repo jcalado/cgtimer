@@ -45,7 +45,7 @@ body {
 }
 
 .monitor h1 {
-  font-size: clamp(11px, 4cqw, 4cqh);
+  font-size: clamp(14px, 8cqw, 8cqh);
   text-align: center;
   font-weight: 600;
   letter-spacing: 0.08em;

@@ -115,15 +115,6 @@ type OscTimerState = {
   elapsed: number;
 };
 
-type TimerMonitorProps = {
-  title: string;
-  value: React.ReactNode;
-  color?: string;
-  labelColor?: string;
-  backgroundColor?: string;
-  showLabel?: boolean;
-};
-
 const STORAGE_KEY = "cgtimer.widgetLayouts.v2";
 const RESIZE_HANDLE_PX = 6;
 
@@ -605,8 +596,8 @@ const useStyles = makeStyles({
     outlineOffset: "-2px",
   },
   rootDropZone: {
-    position: "absolute",
-    inset: 0,
+    flex: 1,
+    minHeight: 0,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -615,6 +606,15 @@ const useStyles = makeStyles({
     ...shorthands.borderRadius(tokens.borderRadiusMedium),
     transitionProperty: "background-color, border-color",
     transitionDuration: tokens.durationFaster,
+  },
+  emptyPlaceholderInner: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    rowGap: tokens.spacingVerticalXS,
+    textAlign: "center",
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
   },
   rootDropZoneActive: {
     backgroundColor: tokens.colorBrandBackground2,
@@ -793,27 +793,6 @@ const Droppable: React.FC<DroppableProps> = ({
     </div>
   );
 };
-
-const TimerMonitor = ({
-  title,
-  value,
-  color,
-  labelColor,
-  backgroundColor,
-  showLabel = true,
-}: TimerMonitorProps) => (
-  <div
-    className="monitor"
-    style={backgroundColor ? { backgroundColor } : undefined}
-  >
-    {showLabel && (
-      <h1 style={labelColor ? { color: labelColor } : undefined}>{title}</h1>
-    )}
-    <div className="clock-face" style={{ color }}>
-      {value}
-    </div>
-  </div>
-);
 
 const getWidgetColors = (
   settings?: WidgetSettings
@@ -1081,6 +1060,8 @@ function App() {
       });
     });
   };
+
+  const isEditing = showEditor && mode === "edit";
 
   useEffect(() => {
     window.api.send("window:get-fullscreen-state");
@@ -1610,21 +1591,30 @@ function App() {
     }
 
     if (node.widgetKey === "productionTimer") {
+      const productionValue = state.enableProductionClock
+        ? state.enableOntime
+          ? Utils.msToTime(state.ontimeCurrent)
+          : state.runtime
+        : "--:--:--";
       return (
-        <TimerMonitor
-          title={customLabel || "Production"}
-          value={
-            state.enableProductionClock
-              ? state.enableOntime
-                ? Utils.msToTime(state.ontimeCurrent)
-                : state.runtime
-              : "--:--:--"
+        <div
+          className="monitor"
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
           }
-          color={colors.faceColor ?? state.productionColor}
-          labelColor={colors.labelColor}
-          backgroundColor={colors.backgroundColor}
-          showLabel={showLabel}
-        />
+        >
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || "Production"}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{ color: colors.faceColor ?? state.productionColor }}
+          >
+            {productionValue}
+          </div>
+        </div>
       );
     }
 
@@ -1657,27 +1647,47 @@ function App() {
 
     if (node.widgetKey === "primaryTimer") {
       return (
-        <TimerMonitor
-          title={customLabel || "Remaining"}
-          value={toTime(state.remainingTime)}
-          color={colors.faceColor ?? remainingTimeColor()}
-          labelColor={colors.labelColor}
-          backgroundColor={colors.backgroundColor}
-          showLabel={showLabel}
-        />
+        <div
+          className="monitor"
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || "Remaining"}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{ color: colors.faceColor ?? remainingTimeColor() }}
+          >
+            {toTime(state.remainingTime)}
+          </div>
+        </div>
       );
     }
 
     if (node.widgetKey === "secondaryTimer") {
       return (
-        <TimerMonitor
-          title={customLabel || "Elapsed"}
-          value={toTime(state.currentTime)}
-          color={colors.faceColor ?? state.elapsedColor}
-          labelColor={colors.labelColor}
-          backgroundColor={colors.backgroundColor}
-          showLabel={showLabel}
-        />
+        <div
+          className="monitor"
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {customLabel || "Elapsed"}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{ color: colors.faceColor ?? state.elapsedColor }}
+          >
+            {toTime(state.currentTime)}
+          </div>
+        </div>
       );
     }
 
@@ -1727,8 +1737,6 @@ function App() {
 
     return null;
   };
-
-  const isEditing = showEditor && mode === "edit";
 
   const renderWidget = (node: WidgetNode) => {
     const widget = widgetCatalog[node.widgetKey];
@@ -1929,18 +1937,23 @@ function App() {
 
   const surfaceContent =
     draftRoot === null ? (
-      isEditing && activeDrag ? (
+      isEditing ? (
         <Droppable
           id="root"
           className={styles.rootDropZone}
           activeClassName={styles.rootDropZoneActive}
         >
-          <Body1Strong>Drop here to add</Body1Strong>
+          <div className={styles.emptyPlaceholderInner}>
+            <Body1Strong>Layout is empty</Body1Strong>
+            <Caption1>
+              Drag a widget from the dock here, or click one to add it.
+            </Caption1>
+          </div>
         </Droppable>
       ) : (
         <div className={styles.emptySurface}>
           <Body1Strong>No widgets in this layout</Body1Strong>
-          <Caption1>Use the dock to add a widget.</Caption1>
+          <Caption1>Open the layout editor (Ctrl/Cmd+E) to add widgets.</Caption1>
         </div>
       )
     ) : draftRoot.type === "widget" ? (
