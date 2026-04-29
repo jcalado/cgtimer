@@ -94,6 +94,12 @@ import {
   persistLayouts,
 } from "./lib/layout-storage";
 import { WIDGET_GROUPS, widgetCatalog } from "./lib/widget-catalog";
+import {
+  clockTime,
+  getTimezoneOffset,
+  getTimezoneTime,
+  toTime,
+} from "./lib/time";
 
 type OscTimerState = {
   startedAt: number | null;
@@ -374,47 +380,6 @@ const useStyles = makeStyles({
     zIndex: 9999,
   },
 });
-
-function toTime(seconds: number) {
-  return new Date(seconds * 1000).toISOString().substr(11, 8);
-}
-
-function clockTime(now: number) {
-  const date = new Date(now);
-  const timeZoneOffset = date.getTimezoneOffset() * 60 * 1000;
-  const timeZoneDate = new Date(date.getTime() - timeZoneOffset);
-  return timeZoneDate.toISOString().substr(11, 8);
-}
-
-function getTimezoneTime(timezone: string, now: number): string {
-  try {
-    const timeString = new Date(now).toLocaleString("en-US", {
-      timeZone: timezone,
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-    const parts = timeString.split(", ");
-    return parts.length > 1 ? parts[1] : timeString;
-  } catch {
-    return "00:00:00";
-  }
-}
-
-function getTimezoneOffset(timezone: string): string {
-  try {
-    const now = new Date();
-    const localDate = new Date();
-    const tzDate = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
-    const offsetMinutes = (tzDate.getTime() - localDate.getTime()) / 60000;
-    const hours = Math.floor(Math.abs(offsetMinutes) / 60);
-    const sign = offsetMinutes >= 0 ? "+" : "-";
-    return `${sign}${hours}h`;
-  } catch {
-    return "";
-  }
-}
 
 function App() {
   const styles = useStyles();
