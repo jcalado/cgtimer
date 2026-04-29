@@ -291,6 +291,10 @@ ipcMain.handle("displays:get", () => {
   return getDisplays();
 });
 
+ipcMain.on("preferences:open", (_event, tab?: string) => {
+  appSettings.show(tab);
+});
+
 ipcMain.on("layouts:update", (_event, layoutNames: string[]) => {
   layoutShortcuts = layoutNames;
   Menu.setApplicationMenu(

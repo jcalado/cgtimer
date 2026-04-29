@@ -33,6 +33,7 @@ interface TimezoneClock {
 
 interface TimezoneSettingsProps {
   clocks: TimezoneClock[];
+  clockColor: string;
   onChange: (clocks: TimezoneClock[]) => void;
 }
 
@@ -55,12 +56,13 @@ const useStyles = makeStyles({
     marginBottom: "16px",
   },
   timePreview: {
-    fontSize: "24px",
+    fontFamily: "led",
+    fontSize: "56px",
+    lineHeight: 1,
     fontWeight: "bold",
-    color: tokens.colorBrandForeground1,
     textAlign: "center",
-    padding: "16px",
-    backgroundColor: tokens.colorNeutralBackground3,
+    padding: "20px 16px",
+    backgroundColor: "#242424",
     borderRadius: "8px",
   },
   emptyState: {
@@ -160,6 +162,7 @@ function getTimezoneTime(timezone: string): string {
 
 export const TimezoneSettings: React.FC<TimezoneSettingsProps> = ({
   clocks,
+  clockColor,
   onChange,
 }) => {
   const styles = useStyles();
@@ -258,7 +261,9 @@ export const TimezoneSettings: React.FC<TimezoneSettingsProps> = ({
 
               <div className={styles.dialogField}>
                 <Label>Current Time in This Timezone</Label>
-                <div className={styles.timePreview}>{previewTime}</div>
+                <div className={styles.timePreview} style={{ color: clockColor }}>
+                  {previewTime}
+                </div>
               </div>
             </DialogContent>
             <DialogActions>

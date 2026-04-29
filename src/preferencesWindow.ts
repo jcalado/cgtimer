@@ -3,10 +3,12 @@ import path from "node:path";
 
 let preferencesWindow: BrowserWindow | null = null;
 
-export function createPreferencesWindow(): void {
-  // If window already exists, focus it
+export function createPreferencesWindow(initialTab?: string): void {
   if (preferencesWindow && !preferencesWindow.isDestroyed()) {
     preferencesWindow.focus();
+    if (initialTab) {
+      preferencesWindow.webContents.send("preferences:select-tab", initialTab);
+    }
     return;
   }
 
@@ -24,12 +26,13 @@ export function createPreferencesWindow(): void {
     autoHideMenuBar: true,
   });
 
-  // Load the preferences window
+  const hash = initialTab ? `#${initialTab}` : "";
   if (process.env.ELECTRON_RENDERER_URL) {
-    // In dev mode, load from the dev server with the preferences route
-    preferencesWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}/preferences.html`);
+    preferencesWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}/preferences.html${hash}`);
   } else {
-    preferencesWindow.loadFile(path.join(__dirname, '../renderer/preferences.html'));
+    preferencesWindow.loadFile(path.join(__dirname, '../renderer/preferences.html'), {
+      hash: initialTab || undefined,
+    });
   }
 
   preferencesWindow.on("closed", () => {

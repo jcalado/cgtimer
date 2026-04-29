@@ -1245,11 +1245,15 @@ function App() {
                 size="small"
                 value={selectedTimezone?.label ?? "Local time"}
                 selectedOptions={[selectedTimezone?.id ?? ""]}
-                onOptionSelect={(_e, data) =>
+                onOptionSelect={(_e, data) => {
+                  if (data.optionValue === "__manage__") {
+                    window.api.send("preferences:open", "timezones");
+                    return;
+                  }
                   handleUpdateWidgetSettings(node.id, {
                     timezoneId: data.optionValue || undefined,
-                  })
-                }
+                  });
+                }}
               >
                 <Option value="">Local time</Option>
                 {timezones.map((tz) => (
@@ -1257,6 +1261,9 @@ function App() {
                     {tz.label}
                   </Option>
                 ))}
+                <Option value="__manage__" text="Manage timezones…">
+                  Manage timezones…
+                </Option>
               </Dropdown>
             </div>
           )}

@@ -32,12 +32,6 @@ body {
   box-sizing: border-box;
 }
 
-@font-face {
-  font-family: led;
-  src: url(../src/assets//fonts/DSEG7Modern-Bold.ttf);
-  font-weight: bold;
-}
-
 .monitor {
   flex: 1;
   background-color: #242424;

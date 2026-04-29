@@ -69,9 +69,36 @@ const useStyles = makeStyles({
 
 type TabValue = "server" | "application" | "production" | "colors" | "timezones";
 
+const TAB_VALUES: TabValue[] = [
+  "server",
+  "application",
+  "production",
+  "colors",
+  "timezones",
+];
+
+const isTabValue = (value: string): value is TabValue =>
+  (TAB_VALUES as string[]).includes(value);
+
+const initialTabFromHash = (): TabValue => {
+  if (typeof window === "undefined") return "server";
+  const hash = window.location.hash.replace(/^#/, "");
+  return isTabValue(hash) ? hash : "server";
+};
+
 export const PreferencesWindow: React.FC = () => {
   const styles = useStyles();
-  const [selectedTab, setSelectedTab] = useState<TabValue>("server");
+  const [selectedTab, setSelectedTab] = useState<TabValue>(initialTabFromHash);
+
+  useEffect(() => {
+    const handleSelectTab = (_event: unknown, tab: string) => {
+      if (isTabValue(tab)) setSelectedTab(tab);
+    };
+    window.api?.receive?.("preferences:select-tab", handleSelectTab);
+    return () => {
+      window.api?.removeListener?.("preferences:select-tab", handleSelectTab);
+    };
+  }, []);
   const [settings, setSettings] = useState<StoreSchema | null>(null);
   const [isDarkMode] = useState(true);
 
@@ -248,6 +275,7 @@ export const PreferencesWindow: React.FC = () => {
             {selectedTab === "timezones" && (
               <TimezoneSettings
                 clocks={settings.timezones.clocks}
+                clockColor={settings.colors.clock}
                 onChange={(clocks) => updateSetting("timezones", "clocks", clocks)}
               />
             )}

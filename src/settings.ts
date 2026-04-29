@@ -12,8 +12,8 @@ export const getDisplays = () => {
 };
 
 class Settings {
-  public show = () => {
-    createPreferencesWindow();
+  public show = (initialTab?: string) => {
+    createPreferencesWindow(initialTab);
   };
 
   public get = (key: string) => {
