@@ -74,6 +74,7 @@ import {
   TextFontRegular,
 } from "@fluentui/react-icons";
 import { Utils } from "../utils";
+import { MonitorWidget } from "./components/MonitorWidget";
 
 type WidgetKind =
   | "worldClock"
@@ -764,16 +765,6 @@ const useStyles = makeStyles({
     paddingBottom: tokens.spacingVerticalXS,
     fontSize: tokens.fontSizeBase200,
     boxShadow: tokens.shadow16,
-  },
-  widgetControl: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    columnGap: tokens.spacingHorizontalS,
-    position: "absolute",
-    top: tokens.spacingVerticalXS,
-    right: tokens.spacingHorizontalXS,
-    zIndex: 2,
   },
   configPopover: {
     display: "flex",
@@ -1696,14 +1687,15 @@ function App() {
       const time = getTimezoneTime(activeZone, now);
 
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {isEditing && (
-            <div className={styles.widgetControl}>
+        <MonitorWidget
+          label={defaultLabel}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={time}
+          defaultFaceColor={state.clockColor}
+          colors={colors}
+          control={
+            isEditing ? (
               <Dropdown
                 size="small"
                 value={selectedTimezone?.label ?? "Local time"}
@@ -1728,43 +1720,22 @@ function App() {
                   Manage timezones…
                 </Option>
               </Dropdown>
-            </div>
-          )}
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || defaultLabel}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{ color: colors.faceColor ?? state.clockColor }}
-          >
-            {time}
-          </div>
-        </div>
+            ) : undefined
+          }
+        />
       );
     }
 
     if (node.widgetKey === "localClock") {
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || "Local Clock"}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{ color: colors.faceColor ?? state.clockColor }}
-          >
-            {clockTime(now)}
-          </div>
-        </div>
+        <MonitorWidget
+          label="Local Clock"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={clockTime(now)}
+          defaultFaceColor={state.clockColor}
+          colors={colors}
+        />
       );
     }
 
@@ -1791,14 +1762,15 @@ function App() {
       }
 
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {isEditing && (
-            <div className={styles.widgetControl}>
+        <MonitorWidget
+          label={`Until ${target}`}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={display}
+          defaultFaceColor={overdue ? "red" : state.clockColor}
+          colors={colors}
+          control={
+            isEditing ? (
               <Input
                 size="small"
                 value={target}
@@ -1809,22 +1781,9 @@ function App() {
                   })
                 }
               />
-            </div>
-          )}
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || `Until ${target}`}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{
-              color: colors.faceColor ?? (overdue ? "red" : state.clockColor),
-            }}
-          >
-            {display}
-          </div>
-        </div>
+            ) : undefined
+          }
+        />
       );
     }
 
@@ -1832,76 +1791,48 @@ function App() {
       const loopColor = state.loop ? "lime" : "#888";
       const loopAriaLabel = state.loop ? "Loop enabled" : "Loop disabled";
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || "Loop"}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{ color: colors.faceColor ?? loopColor }}
-            aria-label={loopAriaLabel}
-            title={loopAriaLabel}
-          >
-            {state.loop ? (
+        <MonitorWidget
+          label="Loop"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={
+            state.loop ? (
               <ArrowRepeatAllRegular className="loop-active" />
             ) : (
               <ProhibitedRegular />
-            )}
-          </div>
-        </div>
+            )
+          }
+          defaultFaceColor={loopColor}
+          colors={colors}
+          faceAriaLabel={loopAriaLabel}
+          faceTitle={loopAriaLabel}
+        />
       );
     }
 
     if (node.widgetKey === "primaryTimer") {
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || "Remaining"}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{ color: colors.faceColor ?? remainingTimeColor() }}
-          >
-            {toTime(state.remainingTime)}
-          </div>
-        </div>
+        <MonitorWidget
+          label="Remaining"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={toTime(state.remainingTime)}
+          defaultFaceColor={remainingTimeColor()}
+          colors={colors}
+        />
       );
     }
 
     if (node.widgetKey === "secondaryTimer") {
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || "Elapsed"}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{ color: colors.faceColor ?? state.elapsedColor }}
-          >
-            {toTime(state.currentTime)}
-          </div>
-        </div>
+        <MonitorWidget
+          label="Elapsed"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={toTime(state.currentTime)}
+          defaultFaceColor={state.elapsedColor}
+          colors={colors}
+        />
       );
     }
 
@@ -1914,14 +1845,15 @@ function App() {
       const displayTime = new Date(displayTimeMs).toISOString().substr(11, 8);
 
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {isEditing && (
-            <div className={styles.widgetControl}>
+        <MonitorWidget
+          label={timerName}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={displayTime}
+          defaultFaceColor={state.clockColor}
+          colors={colors}
+          control={
+            isEditing ? (
               <Input
                 size="small"
                 value={timerName}
@@ -1932,20 +1864,9 @@ function App() {
                   })
                 }
               />
-            </div>
-          )}
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || timerName}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{ color: colors.faceColor ?? state.clockColor }}
-          >
-            {displayTime}
-          </div>
-        </div>
+            ) : undefined
+          }
+        />
       );
     }
 
@@ -1954,54 +1875,32 @@ function App() {
       const overtime = value < 0;
       const display = Utils.msToTime(value);
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || "Ontime"}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{
-              color: colors.faceColor ?? (overtime ? "red" : state.clockColor),
-            }}
-          >
-            {display}
-          </div>
-        </div>
+        <MonitorWidget
+          label="Ontime"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={display}
+          defaultFaceColor={overtime ? "red" : state.clockColor}
+          colors={colors}
+        />
       );
     }
 
     if (node.widgetKey === "ontimeTitle") {
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || "Now"}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{
-              color: colors.faceColor ?? state.clockColor,
-              fontFamily: "inherit",
-              fontSize: "min(8cqw, 18cqh)",
-              padding: "0 4cqw",
-            }}
-          >
-            {state.ontimeTitle || "—"}
-          </div>
-        </div>
+        <MonitorWidget
+          label="Now"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={state.ontimeTitle || "—"}
+          defaultFaceColor={state.clockColor}
+          colors={colors}
+          faceStyle={{
+            fontFamily: "inherit",
+            fontSize: "min(8cqw, 18cqh)",
+            padding: "0 4cqw",
+          }}
+        />
       );
     }
 
@@ -2035,57 +1934,38 @@ function App() {
         return "#888";
       })();
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || playbackLabel}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{ color: colors.faceColor ?? playbackColor }}
-            aria-label={`Playback: ${playbackLabel}`}
-            title={`Playback: ${playbackLabel}`}
-          >
-            {playbackIcon}
-          </div>
-        </div>
+        <MonitorWidget
+          label={playbackLabel}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={playbackIcon}
+          defaultFaceColor={playbackColor}
+          colors={colors}
+          faceAriaLabel={`Playback: ${playbackLabel}`}
+          faceTitle={`Playback: ${playbackLabel}`}
+        />
       );
     }
 
     if (node.widgetKey === "ontimeOnAir") {
       const onAir = state.ontimeOnAir;
       return (
-        <div
-          className={`monitor${onAir ? " ending" : ""}`}
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || (onAir ? "ON AIR" : "OFF AIR")}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{
-              color: colors.faceColor ?? (onAir ? "#dc2626" : "#555"),
-              fontFamily: "inherit",
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              fontSize: "min(14cqw, 35cqh)",
-            }}
-            aria-label={onAir ? "On air" : "Off air"}
-          >
-            {onAir ? "● LIVE" : "OFF"}
-          </div>
-        </div>
+        <MonitorWidget
+          label={onAir ? "ON AIR" : "OFF AIR"}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={onAir ? "● LIVE" : "OFF"}
+          defaultFaceColor={onAir ? "#dc2626" : "#555"}
+          colors={colors}
+          ending={onAir}
+          faceStyle={{
+            fontFamily: "inherit",
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            fontSize: "min(14cqw, 35cqh)",
+          }}
+          faceAriaLabel={onAir ? "On air" : "Off air"}
+        />
       );
     }
 
@@ -2094,24 +1974,14 @@ function App() {
       // Ontime sends an absolute "ms-from-midnight" value; render as wall-clock
       const display = ms > 0 ? Utils.msToTime(ms) : "--:--:--";
       return (
-        <div
-          className="monitor"
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {customLabel || "Expected finish"}
-            </h1>
-          )}
-          <div
-            className="clock-face"
-            style={{ color: colors.faceColor ?? state.clockColor }}
-          >
-            {display}
-          </div>
-        </div>
+        <MonitorWidget
+          label="Expected finish"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={display}
+          defaultFaceColor={state.clockColor}
+          colors={colors}
+        />
       );
     }
 
@@ -2131,18 +2001,18 @@ function App() {
           ? "ST:ND:BY"
           : "OF:FL:NE"
         : "—";
-      const labelText =
-        customLabel || recorder?.label || "HyperDeck";
-
       return (
-        <div
-          className={`monitor${recording ? " ending" : ""}`}
-          style={
-            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
-          }
-        >
-          {isEditing && (
-            <div className={styles.widgetControl}>
+        <MonitorWidget
+          label={recorder?.label || "HyperDeck"}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={display}
+          defaultFaceColor={state.clockColor}
+          colors={colors}
+          ending={recording}
+          faceStyle={{ paddingBottom: "6cqh" }}
+          control={
+            isEditing ? (
               <Dropdown
                 size="small"
                 value={recorder?.label ?? "Pick a recorder"}
@@ -2166,39 +2036,27 @@ function App() {
                   Manage recorders…
                 </Option>
               </Dropdown>
-            </div>
-          )}
-          {showLabel && (
-            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
-              {labelText}
-            </h1>
-          )}
-          {recording && (
-            <span
-              style={{
-                position: "absolute",
-                top: "3cqh",
-                right: "3cqw",
-                fontFamily: "system-ui, sans-serif",
-                color: "#dc2626",
-                fontSize: "min(5cqw, 18cqh)",
-                lineHeight: 1,
-                pointerEvents: "none",
-              }}
-            >
-              ●
-            </span>
-          )}
-          <div
-            className="clock-face"
-            style={{
-              color: colors.faceColor ?? state.clockColor,
-              paddingBottom: "6cqh",
-            }}
-          >
-            {display}
-          </div>
-        </div>
+            ) : undefined
+          }
+          overlay={
+            recording ? (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "3cqh",
+                  right: "3cqw",
+                  fontFamily: "system-ui, sans-serif",
+                  color: "#dc2626",
+                  fontSize: "min(5cqw, 18cqh)",
+                  lineHeight: 1,
+                  pointerEvents: "none",
+                }}
+              >
+                ●
+              </span>
+            ) : undefined
+          }
+        />
       );
     }
 
