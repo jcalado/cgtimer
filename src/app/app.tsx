@@ -1095,17 +1095,22 @@ function App() {
 
   // Auto-hide the window menu bar after 3s of mouse/keyboard inactivity;
   // any movement re-shows it. macOS uses a system-level menu bar so this
-  // toggle is a no-op there and we skip it.
+  // toggle is a no-op there and we skip it. While the layout editor is open
+  // we also pin the bar visible so menu actions stay accessible.
   useEffect(() => {
     const isMac =
       typeof navigator !== "undefined" &&
       /mac/i.test(navigator.platform || navigator.userAgent || "");
     if (isMac) return;
 
+    if (isEditing) {
+      window.api.send("menubar:set-visible", true);
+      return;
+    }
+
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
     let visible = true;
-    let lastX = -1;
-    let lastY = -1;
+    let suppressUntil = 0;
     window.api.send("menubar:set-visible", true);
 
     const armIdle = () => {
@@ -1113,24 +1118,15 @@ function App() {
       idleTimer = setTimeout(() => {
         window.api.send("menubar:set-visible", false);
         visible = false;
+        // Hiding the menu bar reflows the window, which produces synthetic
+        // mousemove events under the cursor. Ignore them briefly so the bar
+        // doesn't immediately bounce back on.
+        suppressUntil = Date.now() + 400;
       }, 3000);
     };
 
-    const handleMouseMove = (event: MouseEvent) => {
-      // Hiding the menu bar reflows the window, which fires a synthetic
-      // mousemove with the same client coordinates. Ignore it so the bar
-      // doesn't reappear without real user motion.
-      if (event.clientX === lastX && event.clientY === lastY) return;
-      lastX = event.clientX;
-      lastY = event.clientY;
-      if (!visible) {
-        window.api.send("menubar:set-visible", true);
-        visible = true;
-      }
-      armIdle();
-    };
-
-    const handleKey = () => {
+    const wake = () => {
+      if (Date.now() < suppressUntil) return;
       if (!visible) {
         window.api.send("menubar:set-visible", true);
         visible = true;
@@ -1139,15 +1135,15 @@ function App() {
     };
 
     armIdle();
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("keydown", handleKey);
+    window.addEventListener("mousemove", wake);
+    window.addEventListener("keydown", wake);
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("mousemove", wake);
+      window.removeEventListener("keydown", wake);
       if (idleTimer) clearTimeout(idleTimer);
       window.api.send("menubar:set-visible", true);
     };
-  }, []);
+  }, [isEditing]);
 
   useEffect(() => {
     const displayResetListener = () => {
