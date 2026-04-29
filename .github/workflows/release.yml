@@ -1,6 +1,9 @@
 name: Release app
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 jobs:
   build:
     strategy:
@@ -19,8 +22,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Build
+        run: yarn build
       - name: Publish app
         env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: npm run publish
+        run: yarn run publish
