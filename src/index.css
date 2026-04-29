@@ -43,45 +43,41 @@ body {
   background-color: #242424;
   height: 100%;
   position: relative;
-  padding: 0px 20px;
+  padding: 3cqh 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   container-type: inline-size;
+  overflow: hidden;
 }
 
-.monitor.ending div {
-  animation: blink-red 1s linear infinite;
-  color: red;
-}
-
-.monitor.ending h1 + div {
-  color: #ff0000;
-}
-
-div > h1 + div {
-  margin: 0;
+.monitor h1 {
+  font-size: clamp(11px, 4cqw, 4cqh);
   text-align: center;
-}
-
-div > h1 {
-  font-size: clamp(12px, 5cqw, 5cqh);
-  text-align: center;
-  font-weight: bolder;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   color: rgb(170, 170, 170);
   text-transform: uppercase;
   margin: 0;
-  margin-bottom: 20px;
+  padding: 0 4cqw;
 }
 
-#loop {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  margin: 0;
-  color: #959595;
+.monitor .clock-face {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-family: "led";
+  font-weight: bold;
+  line-height: 0.9;
   text-align: center;
-  font-size: 1em;
+  font-size: min(24cqw, 32cqh);
+}
+
+.monitor.ending .clock-face {
+  color: red;
+  animation: blink-red 1s linear infinite;
 }
 
 .blink {
@@ -97,55 +93,4 @@ div > h1 {
 .blinkred {
   animation: blink-animation 1s linear infinite;
   color: red;
-}
-
-.columns {
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-}
-
-.columns div > h1 + div {
-  font-size: clamp(18px, 10cqw, 14cqh);
-}
-
-.flexi {
-  flex: 1;
-}
-
-.clocks-stacked {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  justify-content: center;
-}
-
-.monitor.small h1 + div {
-  font-size: clamp(14px, 8cqw, 10cqh);
-}
-
-.clock-face {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-family: "led";
-  font-weight: bold;
-  line-height: 0.9;
-  text-align: center;
-  font-size: min(20cqw, 20cqh);
-}
-
-.clock-face.main {
-  font-size: min(26cqw, 22cqh);
-}
-
-.clock-face.secondary {
-  font-size: min(18cqw, 16cqh);
-}
-
-.monitor.small .clock-face {
-  font-size: min(18cqw, 16cqh);
 }

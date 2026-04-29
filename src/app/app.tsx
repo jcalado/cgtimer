@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import GridLayout, { Layout } from "react-grid-layout";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import {
   Body1Strong,
   Button,
@@ -40,10 +40,10 @@ import {
   ReOrderRegular,
   RenameRegular,
   SaveRegular,
+  SplitHorizontalRegular,
+  SplitVerticalRegular,
 } from "@fluentui/react-icons";
 import { Utils } from "../utils";
-import "react-grid-layout/css/styles.css";
-import "react-resizable/css/styles.css";
 
 type WidgetKind =
   | "worldClock"
@@ -54,37 +54,49 @@ type WidgetKind =
   | "loopState"
   | "oscTimer";
 
+type WidgetSettings = {
+  timezoneId?: string;
+  labelColor?: string;
+  faceColor?: string;
+  backgroundColor?: string;
+  showLabel?: boolean;
+  customLabel?: string;
+  oscTimerName?: string;
+};
+
 type WidgetDefinition = {
   key: WidgetKind;
   label: string;
   description: string;
-  defaultSize: { w: number; h: number };
-  minSize?: { w: number; h: number };
 };
 
-type WidgetLayoutItem = Layout & {
+type WidgetNode = {
+  type: "widget";
+  id: string;
   widgetKey: WidgetKind;
-  settings?: {
-    timezoneId?: string;
-    labelColor?: string;
-    faceColor?: string;
-    backgroundColor?: string;
-    showLabel?: boolean;
-    customLabel?: string;
-    oscTimerName?: string;
-  };
+  settings?: WidgetSettings;
+};
+
+type SplitNode = {
+  type: "split";
+  id: string;
+  direction: "horizontal" | "vertical";
+  sizes: number[];
+  children: LayoutNode[];
+};
+
+type LayoutNode = WidgetNode | SplitNode;
+
+type SavedLayout = {
+  id: string;
+  name: string;
+  root: LayoutNode | null;
+  updatedAt: number;
 };
 
 type OscTimerState = {
   startedAt: number | null;
   elapsed: number;
-};
-
-type SavedLayout = {
-  id: string;
-  name: string;
-  items: WidgetLayoutItem[];
-  updatedAt: number;
 };
 
 type TimerMonitorProps = {
@@ -93,10 +105,249 @@ type TimerMonitorProps = {
   color?: string;
   labelColor?: string;
   backgroundColor?: string;
-  className?: string;
-  faceClassName?: string;
   showLabel?: boolean;
 };
+
+const STORAGE_KEY = "cgtimer.widgetLayouts.v2";
+const RESIZE_HANDLE_PX = 6;
+
+const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
+  worldClock: {
+    key: "worldClock",
+    label: "World Clock",
+    description: "Pick a configured timezone and pin it here",
+  },
+  localClock: {
+    key: "localClock",
+    label: "Local Clock",
+    description: "Shows the local system time",
+  },
+  primaryTimer: {
+    key: "primaryTimer",
+    label: "Remaining Timer",
+    description: "Shows remaining time",
+  },
+  secondaryTimer: {
+    key: "secondaryTimer",
+    label: "Elapsed Timer",
+    description: "Shows elapsed time",
+  },
+  productionTimer: {
+    key: "productionTimer",
+    label: "Production Timer",
+    description: "Displays production runtime or on-time if enabled",
+  },
+  loopState: {
+    key: "loopState",
+    label: "Loop State",
+    description: "Quick indicator for loop mode",
+  },
+  oscTimer: {
+    key: "oscTimer",
+    label: "OSC Timer",
+    description: "Stopwatch triggered via OSC commands",
+  },
+};
+
+const generateId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2, 10);
+
+const equalSizes = (count: number): number[] =>
+  Array.from({ length: count }, () => 100 / count);
+
+const makeWidget = (
+  widgetKey: WidgetKind,
+  settings?: WidgetSettings
+): WidgetNode => ({
+  type: "widget",
+  id: generateId(),
+  widgetKey,
+  settings,
+});
+
+const makeSplit = (
+  direction: "horizontal" | "vertical",
+  children: LayoutNode[]
+): SplitNode => ({
+  type: "split",
+  id: generateId(),
+  direction,
+  sizes: equalSizes(children.length),
+  children,
+});
+
+const findParent = (
+  root: LayoutNode | null,
+  childId: string
+): { parent: SplitNode; index: number } | null => {
+  if (!root || root.type !== "split") return null;
+  const idx = root.children.findIndex((c) => c.id === childId);
+  if (idx >= 0) return { parent: root, index: idx };
+  for (const child of root.children) {
+    const hit = findParent(child, childId);
+    if (hit) return hit;
+  }
+  return null;
+};
+
+const collapse = (node: LayoutNode): LayoutNode => {
+  if (node.type === "widget") return node;
+  const collapsedChildren = node.children.map(collapse);
+  if (collapsedChildren.length === 1) return collapsedChildren[0];
+  // Flatten same-direction nested splits to avoid degenerate trees
+  const flattened: LayoutNode[] = [];
+  const flattenedSizes: number[] = [];
+  collapsedChildren.forEach((child, i) => {
+    if (
+      child.type === "split" &&
+      child.direction === node.direction &&
+      child.children.length > 0
+    ) {
+      const parentShare = node.sizes[i] ?? 100 / collapsedChildren.length;
+      child.children.forEach((grand, gi) => {
+        flattened.push(grand);
+        const grandShare = child.sizes[gi] ?? 100 / child.children.length;
+        flattenedSizes.push((parentShare * grandShare) / 100);
+      });
+    } else {
+      flattened.push(child);
+      flattenedSizes.push(node.sizes[i] ?? 100 / collapsedChildren.length);
+    }
+  });
+  return { ...node, children: flattened, sizes: flattenedSizes };
+};
+
+const removeNode = (
+  root: LayoutNode | null,
+  targetId: string
+): LayoutNode | null => {
+  if (!root) return null;
+  if (root.id === targetId) return null;
+  if (root.type === "widget") return root;
+  const filtered: LayoutNode[] = [];
+  const filteredSizes: number[] = [];
+  root.children.forEach((child, i) => {
+    if (child.id === targetId) return;
+    const reduced = removeNode(child, targetId);
+    if (reduced) {
+      filtered.push(reduced);
+      filteredSizes.push(root.sizes[i] ?? 100 / root.children.length);
+    }
+  });
+  if (filtered.length === 0) return null;
+  // Renormalize sizes to sum 100
+  const total = filteredSizes.reduce((a, b) => a + b, 0) || 1;
+  const normalized = filteredSizes.map((s) => (s * 100) / total);
+  const next: SplitNode = { ...root, children: filtered, sizes: normalized };
+  return collapse(next);
+};
+
+const splitWidgetAt = (
+  root: LayoutNode | null,
+  targetId: string,
+  direction: "horizontal" | "vertical",
+  position: "before" | "after",
+  newWidget: WidgetNode
+): LayoutNode | null => {
+  if (!root) return newWidget;
+  if (root.id === targetId && root.type === "widget") {
+    const children =
+      position === "after" ? [root, newWidget] : [newWidget, root];
+    return makeSplit(direction, children);
+  }
+  if (root.type === "widget") return root;
+  const hit = root.children.findIndex((c) => c.id === targetId);
+  if (hit >= 0 && root.direction === direction) {
+    // Insert as sibling in same-direction parent
+    const insertAt = position === "after" ? hit + 1 : hit;
+    const newChildren = [...root.children];
+    newChildren.splice(insertAt, 0, newWidget);
+    return { ...root, children: newChildren, sizes: equalSizes(newChildren.length) };
+  }
+  // Recurse
+  const newChildren = root.children.map((c) =>
+    splitWidgetAt(c, targetId, direction, position, newWidget)
+  );
+  return { ...root, children: newChildren as LayoutNode[] };
+};
+
+const appendToRoot = (
+  root: LayoutNode | null,
+  newWidget: WidgetNode,
+  direction: "horizontal" | "vertical" = "horizontal"
+): LayoutNode => {
+  if (!root) return newWidget;
+  if (root.type === "split" && root.direction === direction) {
+    const children = [...root.children, newWidget];
+    return { ...root, children, sizes: equalSizes(children.length) };
+  }
+  return makeSplit(direction, [root, newWidget]);
+};
+
+const updateWidgetSettings = (
+  root: LayoutNode | null,
+  targetId: string,
+  patch: WidgetSettings
+): LayoutNode | null => {
+  if (!root) return null;
+  if (root.type === "widget") {
+    if (root.id !== targetId) return root;
+    return { ...root, settings: { ...root.settings, ...patch } };
+  }
+  return {
+    ...root,
+    children: root.children.map(
+      (c) => updateWidgetSettings(c, targetId, patch) as LayoutNode
+    ),
+  };
+};
+
+const updateSplitSizes = (
+  root: LayoutNode | null,
+  splitId: string,
+  sizes: number[]
+): LayoutNode | null => {
+  if (!root || root.type === "widget") return root;
+  if (root.id === splitId) return { ...root, sizes };
+  return {
+    ...root,
+    children: root.children.map(
+      (c) => updateSplitSizes(c, splitId, sizes) as LayoutNode
+    ),
+  };
+};
+
+const collectWidgetIds = (root: LayoutNode | null): string[] => {
+  if (!root) return [];
+  if (root.type === "widget") return [root.id];
+  return root.children.flatMap(collectWidgetIds);
+};
+
+const loadSavedLayouts = (): SavedLayout[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SavedLayout[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistLayouts = (layouts: SavedLayout[]) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts));
+};
+
+const createDefaultLayout = (): SavedLayout => ({
+  id: generateId(),
+  name: "Untitled",
+  updatedAt: Date.now(),
+  root: null,
+});
 
 const useStyles = makeStyles({
   layoutPanel: {
@@ -167,13 +418,13 @@ const useStyles = makeStyles({
       backgroundColor: tokens.colorNeutralBackground3Hover,
     },
   },
-  gridArea: {
+  surface: {
     flex: 1,
     minHeight: 0,
     display: "flex",
     flexDirection: "column",
   },
-  gridAreaEditing: {
+  surfaceEditing: {
     ...shorthands.border("1px", "dashed", tokens.colorNeutralStroke2),
     ...shorthands.borderRadius(tokens.borderRadiusMedium),
     backgroundColor: tokens.colorNeutralBackground1,
@@ -181,6 +432,35 @@ const useStyles = makeStyles({
     paddingRight: tokens.spacingHorizontalXS,
     paddingTop: tokens.spacingVerticalXS,
     paddingBottom: tokens.spacingVerticalXS,
+  },
+  emptySurface: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    rowGap: tokens.spacingVerticalM,
+    color: tokens.colorNeutralForeground3,
+  },
+  resizeHandleHorizontal: {
+    width: `${RESIZE_HANDLE_PX}px`,
+    backgroundColor: "transparent",
+    transitionProperty: "background-color",
+    transitionDuration: tokens.durationFaster,
+    ":hover": { backgroundColor: tokens.colorBrandStroke2 },
+    "&[data-resize-handle-active]": {
+      backgroundColor: tokens.colorBrandStroke1,
+    },
+  },
+  resizeHandleVertical: {
+    height: `${RESIZE_HANDLE_PX}px`,
+    backgroundColor: "transparent",
+    transitionProperty: "background-color",
+    transitionDuration: tokens.durationFaster,
+    ":hover": { backgroundColor: tokens.colorBrandStroke2 },
+    "&[data-resize-handle-active]": {
+      backgroundColor: tokens.colorBrandStroke1,
+    },
   },
   widgetCard: {
     height: "100%",
@@ -205,7 +485,6 @@ const useStyles = makeStyles({
     paddingRight: tokens.spacingHorizontalXS,
     paddingTop: tokens.spacingVerticalXXS,
     paddingBottom: tokens.spacingVerticalXXS,
-    cursor: "move",
   },
   widgetCardTitle: {
     fontSize: tokens.fontSizeBase200,
@@ -342,29 +621,23 @@ const TimerMonitor = ({
   color,
   labelColor,
   backgroundColor,
-  className = "",
-  faceClassName = "",
   showLabel = true,
-}: TimerMonitorProps) => {
-  const containerClass = ["monitor", className].filter(Boolean).join(" ");
-  const faceClass = ["clock-face", faceClassName].filter(Boolean).join(" ");
-  return (
-    <div
-      className={containerClass}
-      style={backgroundColor ? { backgroundColor } : undefined}
-    >
-      {showLabel && (
-        <h1 style={labelColor ? { color: labelColor } : undefined}>{title}</h1>
-      )}
-      <div className={faceClass} style={{ color }}>
-        {value}
-      </div>
+}: TimerMonitorProps) => (
+  <div
+    className="monitor"
+    style={backgroundColor ? { backgroundColor } : undefined}
+  >
+    {showLabel && (
+      <h1 style={labelColor ? { color: labelColor } : undefined}>{title}</h1>
+    )}
+    <div className="clock-face" style={{ color }}>
+      {value}
     </div>
-  );
-};
+  </div>
+);
 
 const getWidgetColors = (
-  settings?: WidgetLayoutItem["settings"]
+  settings?: WidgetSettings
 ): { labelColor?: string; faceColor?: string; backgroundColor?: string } => ({
   labelColor: settings?.labelColor || undefined,
   faceColor: settings?.faceColor || undefined,
@@ -372,16 +645,16 @@ const getWidgetColors = (
 });
 
 type ColorConfigPanelProps = {
-  item: WidgetLayoutItem;
-  onChange: (updates: WidgetLayoutItem["settings"]) => void;
+  node: WidgetNode;
+  onChange: (updates: WidgetSettings) => void;
   onClose: () => void;
 };
 
-const ColorConfigPanel = ({ item, onChange, onClose }: ColorConfigPanelProps) => {
+const ColorConfigPanel = ({ node, onChange, onClose }: ColorConfigPanelProps) => {
   const styles = useStyles();
-  const colors = getWidgetColors(item.settings);
-  const showLabel = item.settings?.showLabel !== false;
-  const customLabel = item.settings?.customLabel ?? "";
+  const colors = getWidgetColors(node.settings);
+  const showLabel = node.settings?.showLabel !== false;
+  const customLabel = node.settings?.customLabel ?? "";
 
   const handleColorChange =
     (key: "labelColor" | "faceColor" | "backgroundColor") =>
@@ -507,147 +780,11 @@ function getTimezoneOffset(timezone: string): string {
   }
 }
 
-const STORAGE_KEY = "cgtimer.widgetLayouts.v1";
-const GRID_COLS = 12;
-
-const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
-  worldClock: {
-    key: "worldClock",
-    label: "World Clock",
-    description: "Pick a configured timezone and pin it here",
-    defaultSize: { w: 4, h: 4 },
-    minSize: { w: 3, h: 3 },
-  },
-  localClock: {
-    key: "localClock",
-    label: "Local Clock",
-    description: "Shows the local system time",
-    defaultSize: { w: 4, h: 4 },
-    minSize: { w: 3, h: 3 },
-  },
-  primaryTimer: {
-    key: "primaryTimer",
-    label: "Remaining Timer",
-    description: "Shows remaining time",
-    defaultSize: { w: 3, h: 3 },
-    minSize: { w: 3, h: 3 },
-  },
-  secondaryTimer: {
-    key: "secondaryTimer",
-    label: "Elapsed Timer",
-    description: "Shows elapsed time",
-    defaultSize: { w: 3, h: 3 },
-    minSize: { w: 3, h: 3 },
-  },
-  productionTimer: {
-    key: "productionTimer",
-    label: "Production Timer",
-    description: "Displays production runtime or on-time if enabled",
-    defaultSize: { w: 3, h: 3 },
-    minSize: { w: 3, h: 3 },
-  },
-  loopState: {
-    key: "loopState",
-    label: "Loop State",
-    description: "Quick indicator for loop mode",
-    defaultSize: { w: 2, h: 2 },
-    minSize: { w: 2, h: 2 },
-  },
-  oscTimer: {
-    key: "oscTimer",
-    label: "OSC Timer",
-    description: "Stopwatch triggered via OSC commands",
-    defaultSize: { w: 3, h: 3 },
-    minSize: { w: 3, h: 3 },
-  },
-};
-
-const generateId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2, 10);
-
-const loadSavedLayouts = (): SavedLayout[] => {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as SavedLayout[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const persistLayouts = (layouts: SavedLayout[]) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts));
-};
-
-const normalizeLayoutSet = (layouts: SavedLayout[]): SavedLayout[] => layouts;
-
-const createDefaultLayout = (): SavedLayout => ({
-  id: generateId(),
-  name: "Default",
-  updatedAt: Date.now(),
-  items: [
-    {
-      i: generateId(),
-      x: 0,
-      y: 0,
-      w: widgetCatalog.localClock.defaultSize.w,
-      h: widgetCatalog.localClock.defaultSize.h,
-      widgetKey: "localClock",
-    },
-    {
-      i: generateId(),
-      x: 4,
-      y: 0,
-      w: widgetCatalog.productionTimer.defaultSize.w,
-      h: widgetCatalog.productionTimer.defaultSize.h,
-      widgetKey: "productionTimer",
-    },
-    {
-      i: generateId(),
-      x: 7,
-      y: 0,
-      w: widgetCatalog.worldClock.defaultSize.w,
-      h: widgetCatalog.worldClock.defaultSize.h,
-      widgetKey: "worldClock",
-    },
-    {
-      i: generateId(),
-      x: 0,
-      y: 4,
-      w: widgetCatalog.primaryTimer.defaultSize.w,
-      h: widgetCatalog.primaryTimer.defaultSize.h,
-      widgetKey: "primaryTimer",
-    },
-    {
-      i: generateId(),
-      x: 4,
-      y: 4,
-      w: widgetCatalog.secondaryTimer.defaultSize.w,
-      h: widgetCatalog.secondaryTimer.defaultSize.h,
-      widgetKey: "secondaryTimer",
-    },
-    {
-      i: generateId(),
-      x: 7,
-      y: 4,
-      w: widgetCatalog.loopState.defaultSize.w,
-      h: widgetCatalog.loopState.defaultSize.h,
-      widgetKey: "loopState",
-    },
-  ],
-});
-
 function App() {
   const styles = useStyles();
   const initialLayouts = useMemo(() => {
     const stored = loadSavedLayouts();
-    const hydrated = stored.length ? stored : [createDefaultLayout()];
-    return normalizeLayoutSet(hydrated);
+    return stored.length ? stored : [createDefaultLayout()];
   }, []);
 
   const [state, setState] = useState({
@@ -688,16 +825,13 @@ function App() {
   const [selectedLayoutId, setSelectedLayoutId] = useState<string>(
     initialLayouts[0]?.id ?? ""
   );
-  const [draftItems, setDraftItems] = useState<WidgetLayoutItem[]>(
-    () => (initialLayouts[0]?.items ?? []).map((item) => ({ ...item }))
+  const [draftRoot, setDraftRoot] = useState<LayoutNode | null>(
+    initialLayouts[0]?.root ?? null
   );
   const layoutsRef = useRef<SavedLayout[]>(initialLayouts);
   const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null);
   const [mode, setMode] = useState<"edit" | "preview">("preview");
   const [showEditor, setShowEditor] = useState(false);
-  const [gridWidth, setGridWidth] = useState<number>(
-    typeof window !== "undefined" ? window.innerWidth - 32 : 1200
-  );
   const [dockState, setDockState] = useState(() => {
     const baseWidth =
       typeof window !== "undefined"
@@ -707,8 +841,6 @@ function App() {
   });
   const dockDragRef = useRef<{ dx: number; dy: number } | null>(null);
   const dockResizeRef = useRef<{ startWidth: number; startX: number } | null>(null);
-  const gridContainerRef = useRef<HTMLDivElement | null>(null);
-  const dragOriginRef = useRef<WidgetLayoutItem[] | null>(null);
   const [renameTargetId, setRenameTargetId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [saveAsOpen, setSaveAsOpen] = useState(false);
@@ -716,13 +848,10 @@ function App() {
 
   useEffect(() => {
     window.api.send("window:get-fullscreen-state");
-
     const fullscreenListener = (_event: unknown, fullscreen: boolean) => {
       setIsFullscreen(fullscreen);
     };
-
     window.api.receive("window:fullscreen-state", fullscreenListener);
-
     return () => {
       window.api.removeListener("window:fullscreen-state", fullscreenListener);
     };
@@ -750,10 +879,7 @@ function App() {
     };
 
     const timersListener = (_event: unknown, arg: Partial<typeof state>) => {
-      setState((prev) => ({
-        ...prev,
-        ...arg,
-      }));
+      setState((prev) => ({ ...prev, ...arg }));
     };
 
     window.api.receive("display:reset", displayResetListener);
@@ -776,26 +902,12 @@ function App() {
     };
   }, []);
 
-  const Status = {
-    RUNNING: 0,
-    HALFWAY: 1,
-    ENDING: 2,
-    ENDED: 3,
-  };
+  const Status = { RUNNING: 0, HALFWAY: 1, ENDING: 2, ENDED: 3 };
 
   const status = () => {
-    if (state.remainingTime <= 0) {
-      return Status.ENDED;
-    }
-
-    if (state.remainingTime <= state.totalTime / 4) {
-      return Status.ENDING;
-    }
-
-    if (state.remainingTime <= state.totalTime / 2) {
-      return Status.HALFWAY;
-    }
-
+    if (state.remainingTime <= 0) return Status.ENDED;
+    if (state.remainingTime <= state.totalTime / 4) return Status.ENDING;
+    if (state.remainingTime <= state.totalTime / 2) return Status.HALFWAY;
     return Status.RUNNING;
   };
 
@@ -806,7 +918,6 @@ function App() {
       case Status.HALFWAY:
         return "orange";
       case Status.ENDING:
-        return "red";
       case Status.ENDED:
         return "red";
       default:
@@ -819,14 +930,12 @@ function App() {
   };
 
   const selectedLayout = useMemo(
-    () => layouts.find((layout) => layout.id === selectedLayoutId) ?? layouts[0],
+    () => layouts.find((l) => l.id === selectedLayoutId) ?? layouts[0],
     [layouts, selectedLayoutId]
   );
 
   useEffect(() => {
-    if (selectedLayout) {
-      setDraftItems(selectedLayout.items.map((item) => ({ ...item })));
-    }
+    if (selectedLayout) setDraftRoot(selectedLayout.root);
   }, [selectedLayout]);
 
   useEffect(() => {
@@ -842,32 +951,8 @@ function App() {
   }, [layouts]);
 
   useEffect(() => {
-    if (mode !== "edit" || !showEditor) {
-      setConfiguringWidgetId(null);
-    }
+    if (mode !== "edit" || !showEditor) setConfiguringWidgetId(null);
   }, [mode, showEditor]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (gridContainerRef.current) {
-        setGridWidth(gridContainerRef.current.clientWidth);
-      } else {
-        setGridWidth(window.innerWidth - 32);
-      }
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      if (gridContainerRef.current) {
-        setGridWidth(gridContainerRef.current.clientWidth);
-      }
-    });
-    return () => cancelAnimationFrame(id);
-  }, [showEditor, mode]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -885,15 +970,12 @@ function App() {
         }));
       }
     };
-
     const handleMouseUp = () => {
       dockDragRef.current = null;
       dockResizeRef.current = null;
     };
-
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
-
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
@@ -902,39 +984,33 @@ function App() {
 
   useEffect(() => {
     const handleLayoutLoad = (_event: unknown, layoutName: string) => {
-      const currentLayouts = layoutsRef.current;
-      const target = currentLayouts.find(
+      const target = layoutsRef.current.find(
         (layout) => layout.name.toLowerCase() === String(layoutName).toLowerCase()
       );
       if (!target) return;
       setSelectedLayoutId(target.id);
-      setDraftItems(target.items.map((item) => ({ ...item })));
+      setDraftRoot(target.root);
       setMode("preview");
       setShowEditor(false);
     };
-
     window.api.receive("layout:load", handleLayoutLoad);
     return () => {
       window.api.removeListener("layout:load", handleLayoutLoad);
     };
   }, []);
 
-  // OSC Timer: tick update for running timers
   useEffect(() => {
     const hasRunningTimer = Object.values(oscTimers).some((t) => t.startedAt !== null);
     if (!hasRunningTimer) return;
-
     const interval = setInterval(() => setCurrentTick(Date.now()), 100);
     return () => clearInterval(interval);
   }, [oscTimers]);
 
-  // OSC Timer: persist state
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("cgtimer.oscTimers", JSON.stringify(oscTimers));
   }, [oscTimers]);
 
-  // OSC Timer: listen for commands
   useEffect(() => {
     const handleTimerCommand = (
       _event: unknown,
@@ -943,7 +1019,6 @@ function App() {
       setOscTimers((prev) => {
         const timer = prev[name] || { startedAt: null, elapsed: 0 };
         const now = Date.now();
-
         switch (action) {
           case "start":
             if (timer.startedAt) return prev;
@@ -978,46 +1053,11 @@ function App() {
         }
       });
     };
-
     window.api.receive("osc-timer:command", handleTimerCommand);
     return () => {
       window.api.removeListener("osc-timer:command", handleTimerCommand);
     };
   }, []);
-
-  const handleLayoutChange = (newLayout: Layout[]) => {
-    if (!isEditing) return;
-    setDraftItems((prev) =>
-      newLayout.map((item) => {
-        const existing = prev.find((p) => p.i === item.i);
-        return {
-          ...item,
-          widgetKey: existing?.widgetKey ?? "worldClock",
-          settings: existing?.settings,
-        };
-      })
-    );
-  };
-
-  const handleDragStart = () => {
-    if (!isEditing) return;
-    dragOriginRef.current = draftItems.map((item) => ({ ...item }));
-  };
-
-  const handleDragStop = (layout: Layout[]) => {
-    if (!isEditing) return;
-    const normalizedLayout = layout.map((l) => {
-      const existing = draftItems.find((p) => p.i === l.i);
-      return {
-        ...l,
-        widgetKey: existing?.widgetKey ?? "worldClock",
-        settings: existing?.settings,
-      };
-    });
-
-    setDraftItems(normalizedLayout);
-    dragOriginRef.current = null;
-  };
 
   const handleDockDragStart = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -1029,64 +1069,50 @@ function App() {
   };
 
   const handleDockResizeStart = (event: React.MouseEvent) => {
-    dockResizeRef.current = {
-      startWidth: dockState.width,
-      startX: event.clientX,
-    };
+    dockResizeRef.current = { startWidth: dockState.width, startX: event.clientX };
     event.stopPropagation();
   };
 
-  const handleAddWidget = (widgetKey: WidgetKind) => {
-    const definition = widgetCatalog[widgetKey];
-    const defaultTimezoneId =
-      state.timezoneClocks.find((tz) => tz.enabled)?.id ||
-      state.timezoneClocks[0]?.id;
-
-    const getDefaultSettings = (): WidgetLayoutItem["settings"] => {
-      if (widgetKey === "worldClock") {
-        return { timezoneId: defaultTimezoneId };
-      }
-      if (widgetKey === "oscTimer") {
-        return { oscTimerName: `timer${generateId().slice(0, 4)}` };
-      }
-      return {};
-    };
-
-    const newItem: WidgetLayoutItem = {
-      i: generateId(),
-      x: 0,
-      y: Infinity,
-      w: definition.defaultSize.w,
-      h: definition.defaultSize.h,
-      minW: definition.minSize?.w,
-      minH: definition.minSize?.h,
-      widgetKey,
-      settings: getDefaultSettings(),
-    };
-    setDraftItems((prev) => [...prev, newItem]);
+  const buildDefaultSettings = (widgetKey: WidgetKind): WidgetSettings | undefined => {
+    if (widgetKey === "worldClock") {
+      const defaultTimezoneId =
+        state.timezoneClocks.find((tz) => tz.enabled)?.id ||
+        state.timezoneClocks[0]?.id;
+      return { timezoneId: defaultTimezoneId };
+    }
+    if (widgetKey === "oscTimer") {
+      return { oscTimerName: `timer${generateId().slice(0, 4)}` };
+    }
+    return undefined;
   };
 
-  const handleUpdateWidgetSettings = (
-    id: string,
-    updates: WidgetLayoutItem["settings"]
+  const handleAddWidget = (widgetKey: WidgetKind) => {
+    const widget = makeWidget(widgetKey, buildDefaultSettings(widgetKey));
+    setDraftRoot((prev) => appendToRoot(prev, widget, "horizontal"));
+  };
+
+  const handleSplitWidget = (
+    widgetId: string,
+    direction: "horizontal" | "vertical"
   ) => {
-    setDraftItems((prev) =>
-      prev.map((item) =>
-        item.i === id
-          ? {
-              ...item,
-              settings: { ...item.settings, ...updates },
-            }
-          : item
-      )
-    );
+    setDraftRoot((prev) => {
+      const widgetKey = "localClock" as WidgetKind;
+      const widget = makeWidget(widgetKey, buildDefaultSettings(widgetKey));
+      return splitWidgetAt(prev, widgetId, direction, "after", widget);
+    });
+  };
+
+  const handleUpdateWidgetSettings = (id: string, updates: WidgetSettings) => {
+    setDraftRoot((prev) => updateWidgetSettings(prev, id, updates));
   };
 
   const handleRemoveWidget = (id: string) => {
-    if (configuringWidgetId === id) {
-      setConfiguringWidgetId(null);
-    }
-    setDraftItems((prev) => prev.filter((item) => item.i !== id));
+    if (configuringWidgetId === id) setConfiguringWidgetId(null);
+    setDraftRoot((prev) => removeNode(prev, id));
+  };
+
+  const handleSplitSizes = (splitId: string, sizes: number[]) => {
+    setDraftRoot((prev) => updateSplitSizes(prev, splitId, sizes));
   };
 
   const handleSaveLayout = () => {
@@ -1095,7 +1121,7 @@ function App() {
         id: generateId(),
         name: "Layout",
         updatedAt: Date.now(),
-        items: draftItems,
+        root: draftRoot,
       };
       setLayouts([fallback]);
       setSelectedLayoutId(fallback.id);
@@ -1105,7 +1131,7 @@ function App() {
     }
     const updated = layouts.map((layout) =>
       layout.id === selectedLayout.id
-        ? { ...layout, items: draftItems, updatedAt: Date.now() }
+        ? { ...layout, root: draftRoot, updatedAt: Date.now() }
         : layout
     );
     setLayouts(updated);
@@ -1125,7 +1151,7 @@ function App() {
       id: generateId(),
       name,
       updatedAt: Date.now(),
-      items: draftItems,
+      root: draftRoot,
     };
     setLayouts((prev) => [...prev, newLayout]);
     setSelectedLayoutId(newLayout.id);
@@ -1135,7 +1161,12 @@ function App() {
   };
 
   const handleNewLayout = () => {
-    const fresh = createDefaultLayout();
+    const fresh: SavedLayout = {
+      id: generateId(),
+      name: "Untitled",
+      updatedAt: Date.now(),
+      root: null,
+    };
     setLayouts((prev) => [...prev, fresh]);
     setSelectedLayoutId(fresh.id);
   };
@@ -1147,7 +1178,7 @@ function App() {
       id: generateId(),
       name: `${selectedLayout.name} copy`,
       updatedAt: Date.now(),
-      items: draftItems.map((item) => ({ ...item, i: generateId() })),
+      root: draftRoot ? cloneTreeWithNewIds(draftRoot) : null,
     };
     setLayouts((prev) => [...prev, copy]);
     setSelectedLayoutId(copy.id);
@@ -1155,7 +1186,7 @@ function App() {
 
   const handleRenameLayout = () => {
     if (!selectedLayoutId) return;
-    const current = layoutsRef.current.find((layout) => layout.id === selectedLayoutId);
+    const current = layoutsRef.current.find((l) => l.id === selectedLayoutId);
     setRenameTargetId(selectedLayoutId);
     setRenameValue(current?.name ?? "");
   };
@@ -1174,9 +1205,7 @@ function App() {
     setRenameTargetId(null);
   };
 
-  const handleRenameCancel = () => {
-    setRenameTargetId(null);
-  };
+  const handleRenameCancel = () => setRenameTargetId(null);
 
   const handleDeleteLayout = () => {
     if (!selectedLayout) return;
@@ -1186,33 +1215,30 @@ function App() {
     setSelectedLayoutId(nextLayouts[0]?.id ?? "");
   };
 
-  const renderWidget = (item: WidgetLayoutItem, isEditing: boolean) => {
-    const widget = widgetCatalog[item.widgetKey];
-    const colors = getWidgetColors(item.settings);
-    const showLabel = item.settings?.showLabel !== false;
-    const customLabel = item.settings?.customLabel;
-    if (!widget) {
-      return <div>Unknown widget</div>;
-    }
+  const renderWidgetBody = (node: WidgetNode, isEditing: boolean) => {
+    const widget = widgetCatalog[node.widgetKey];
+    const colors = getWidgetColors(node.settings);
+    const showLabel = node.settings?.showLabel !== false;
+    const customLabel = node.settings?.customLabel;
+    if (!widget) return <div>Unknown widget</div>;
 
-    if (widget.key === "worldClock") {
+    if (node.widgetKey === "worldClock") {
       const timezones = state.timezoneClocks;
+      const fallbackZone = "UTC";
       const selectedTimezone =
-        timezones.find((tz) => tz.id === item.settings?.timezoneId) ||
-        timezones[0];
-      const defaultLabel = selectedTimezone
-        ? `${selectedTimezone.label} (${getTimezoneOffset(selectedTimezone.timezone)})`
-        : "Configure a timezone";
-      const time = selectedTimezone
-        ? getTimezoneTime(selectedTimezone.timezone)
-        : clockTime();
-
-      const monitorStyle = colors.backgroundColor
-        ? { backgroundColor: colors.backgroundColor }
-        : undefined;
+        timezones.find((tz) => tz.id === node.settings?.timezoneId) || timezones[0];
+      const activeZone = selectedTimezone?.timezone ?? fallbackZone;
+      const activeLabel = selectedTimezone?.label ?? fallbackZone;
+      const defaultLabel = `${activeLabel} (${getTimezoneOffset(activeZone)})`;
+      const time = getTimezoneTime(activeZone);
 
       return (
-        <div className="monitor" style={monitorStyle}>
+        <div
+          className="monitor"
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
           {isEditing && (
             <div className={styles.widgetControl}>
               <Dropdown
@@ -1220,7 +1246,7 @@ function App() {
                 value={selectedTimezone?.label ?? "Local time"}
                 selectedOptions={[selectedTimezone?.id ?? ""]}
                 onOptionSelect={(_e, data) =>
-                  handleUpdateWidgetSettings(item.i, {
+                  handleUpdateWidgetSettings(node.id, {
                     timezoneId: data.optionValue || undefined,
                   })
                 }
@@ -1243,13 +1269,13 @@ function App() {
             className="clock-face"
             style={{ color: colors.faceColor ?? state.clockColor }}
           >
-            {timezones.length ? time : "Add a timezone in Preferences"}
+            {time}
           </div>
         </div>
       );
     }
 
-    if (widget.key === "localClock") {
+    if (node.widgetKey === "localClock") {
       return (
         <div
           className="monitor"
@@ -1272,7 +1298,7 @@ function App() {
       );
     }
 
-    if (widget.key === "productionTimer") {
+    if (node.widgetKey === "productionTimer") {
       return (
         <TimerMonitor
           title={customLabel || "Production"}
@@ -1286,18 +1312,17 @@ function App() {
           color={colors.faceColor ?? state.productionColor}
           labelColor={colors.labelColor}
           backgroundColor={colors.backgroundColor}
-          className="small"
           showLabel={showLabel}
         />
       );
     }
 
-    if (widget.key === "loopState") {
+    if (node.widgetKey === "loopState") {
       const loopColor = state.loop ? "lime" : "#888";
       const loopAriaLabel = state.loop ? "Loop enabled" : "Loop disabled";
       return (
         <div
-          className="monitor small"
+          className="monitor"
           style={
             colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
           }
@@ -1313,17 +1338,13 @@ function App() {
             aria-label={loopAriaLabel}
             title={loopAriaLabel}
           >
-            {state.loop ? (
-              <ArrowRepeatAllRegular fontSize={56} />
-            ) : (
-              <ProhibitedRegular fontSize={56} />
-            )}
+            {state.loop ? <ArrowRepeatAllRegular /> : <ProhibitedRegular />}
           </div>
         </div>
       );
     }
 
-    if (widget.key === "primaryTimer") {
+    if (node.widgetKey === "primaryTimer") {
       return (
         <TimerMonitor
           title={customLabel || "Remaining"}
@@ -1331,13 +1352,12 @@ function App() {
           color={colors.faceColor ?? remainingTimeColor()}
           labelColor={colors.labelColor}
           backgroundColor={colors.backgroundColor}
-          className="clocks-stacked"
           showLabel={showLabel}
         />
       );
     }
 
-    if (widget.key === "secondaryTimer") {
+    if (node.widgetKey === "secondaryTimer") {
       return (
         <TimerMonitor
           title={customLabel || "Elapsed"}
@@ -1345,14 +1365,13 @@ function App() {
           color={colors.faceColor ?? state.elapsedColor}
           labelColor={colors.labelColor}
           backgroundColor={colors.backgroundColor}
-          className="clocks-stacked"
           showLabel={showLabel}
         />
       );
     }
 
-    if (widget.key === "oscTimer") {
-      const timerName = item.settings?.oscTimerName || "default";
+    if (node.widgetKey === "oscTimer") {
+      const timerName = node.settings?.oscTimerName || "default";
       const timer = oscTimers[timerName] || { startedAt: null, elapsed: 0 };
       const displayTimeMs = timer.startedAt
         ? timer.elapsed + (currentTick - timer.startedAt)
@@ -1373,7 +1392,7 @@ function App() {
                 value={timerName}
                 placeholder="default"
                 onChange={(_e, data) =>
-                  handleUpdateWidgetSettings(item.i, {
+                  handleUpdateWidgetSettings(node.id, {
                     oscTimerName: data.value || undefined,
                   })
                 }
@@ -1399,6 +1418,142 @@ function App() {
   };
 
   const isEditing = showEditor && mode === "edit";
+
+  const renderWidget = (node: WidgetNode) => {
+    const widget = widgetCatalog[node.widgetKey];
+    return (
+      <div
+        className={mergeClasses(
+          styles.widgetCard,
+          !showEditor && styles.widgetCardDisplay
+        )}
+      >
+        {showEditor && (
+          <div className={styles.widgetCardHeader}>
+            <div>
+              <Body1Strong className={styles.widgetCardTitle}>
+                {widget?.label ?? "Widget"}
+              </Body1Strong>
+              <Caption1 className={styles.widgetCardSubtitle} block>
+                {widget?.description}
+              </Caption1>
+            </div>
+            {isEditing && (
+              <div className={styles.widgetCardActions}>
+                <Tooltip
+                  content="Split right"
+                  relationship="label"
+                  withArrow
+                >
+                  <Button
+                    appearance="subtle"
+                    size="small"
+                    icon={<SplitVerticalRegular />}
+                    aria-label="Split right"
+                    onClick={() => handleSplitWidget(node.id, "horizontal")}
+                  />
+                </Tooltip>
+                <Tooltip content="Split down" relationship="label" withArrow>
+                  <Button
+                    appearance="subtle"
+                    size="small"
+                    icon={<SplitHorizontalRegular />}
+                    aria-label="Split down"
+                    onClick={() => handleSplitWidget(node.id, "vertical")}
+                  />
+                </Tooltip>
+                <Popover
+                  open={configuringWidgetId === node.id}
+                  onOpenChange={(_e, data) =>
+                    setConfiguringWidgetId(data.open ? node.id : null)
+                  }
+                  positioning="below-end"
+                  trapFocus
+                >
+                  <PopoverTrigger disableButtonEnhancement>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      icon={<ColorRegular />}
+                      aria-label="Configure widget"
+                    />
+                  </PopoverTrigger>
+                  <PopoverSurface>
+                    <ColorConfigPanel
+                      node={node}
+                      onChange={(updates) =>
+                        handleUpdateWidgetSettings(node.id, updates)
+                      }
+                      onClose={() => setConfiguringWidgetId(null)}
+                    />
+                  </PopoverSurface>
+                </Popover>
+                <Button
+                  appearance="subtle"
+                  size="small"
+                  icon={<DismissRegular />}
+                  aria-label="Remove widget"
+                  onClick={() => handleRemoveWidget(node.id)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        <div className={styles.widgetCardBody}>{renderWidgetBody(node, isEditing)}</div>
+      </div>
+    );
+  };
+
+  const renderNode = (node: LayoutNode): React.ReactNode => {
+    if (node.type === "widget") return renderWidget(node);
+    return (
+      <PanelGroup
+        key={node.id}
+        direction={node.direction}
+        style={{ flex: 1, minHeight: 0 }}
+        onLayout={(sizes) => handleSplitSizes(node.id, sizes)}
+      >
+        {node.children.map((child, i) => (
+          <React.Fragment key={child.id}>
+            {i > 0 && (
+              <PanelResizeHandle
+                className={
+                  node.direction === "horizontal"
+                    ? styles.resizeHandleHorizontal
+                    : styles.resizeHandleVertical
+                }
+              />
+            )}
+            <Panel
+              id={child.id}
+              order={i}
+              defaultSize={node.sizes[i] ?? 100 / node.children.length}
+              minSize={5}
+            >
+              {renderNode(child)}
+            </Panel>
+          </React.Fragment>
+        ))}
+      </PanelGroup>
+    );
+  };
+
+  const surfaceContent =
+    draftRoot === null ? (
+      <div className={styles.emptySurface}>
+        <Body1Strong>No widgets in this layout</Body1Strong>
+        <Caption1>Use the dock to add a widget.</Caption1>
+      </div>
+    ) : draftRoot.type === "widget" ? (
+      // Single-widget root: wrap in a single-panel group so resizing semantics stay consistent
+      <PanelGroup direction="horizontal" style={{ flex: 1, minHeight: 0 }}>
+        <Panel id={draftRoot.id} order={0} defaultSize={100} minSize={5}>
+          {renderNode(draftRoot)}
+        </Panel>
+      </PanelGroup>
+    ) : (
+      renderNode(draftRoot)
+    );
 
   const renderDock = () => (
     <div
@@ -1530,108 +1685,9 @@ function App() {
         {showEditor && renderDock()}
 
         <div
-          className={mergeClasses(
-            styles.gridArea,
-            showEditor && styles.gridAreaEditing
-          )}
-          ref={gridContainerRef}
+          className={mergeClasses(styles.surface, showEditor && styles.surfaceEditing)}
         >
-          {gridWidth > 0 ? (
-            <GridLayout
-              key={selectedLayoutId}
-              layout={draftItems}
-              cols={GRID_COLS}
-              rowHeight={60}
-              width={gridWidth}
-              margin={[12, 12]}
-              containerPadding={[0, 0]}
-              onLayoutChange={handleLayoutChange}
-              onDragStart={showEditor ? handleDragStart : undefined}
-              onDragStop={showEditor ? handleDragStop : undefined}
-              draggableHandle={showEditor ? ".widget-card-handle" : undefined}
-              isDraggable={isEditing}
-              isResizable={isEditing}
-              preventCollision
-              compactType={null}
-            >
-              {draftItems.map((item) => {
-                const widget = widgetCatalog[item.widgetKey];
-                return (
-                  <div
-                    key={item.i}
-                    className={mergeClasses(
-                      styles.widgetCard,
-                      !showEditor && styles.widgetCardDisplay
-                    )}
-                  >
-                    {showEditor && (
-                      <div
-                        className={mergeClasses(
-                          styles.widgetCardHeader,
-                          "widget-card-handle"
-                        )}
-                      >
-                        <div>
-                          <Body1Strong className={styles.widgetCardTitle}>
-                            {widget?.label ?? "Widget"}
-                          </Body1Strong>
-                          <Caption1 className={styles.widgetCardSubtitle} block>
-                            {widget?.description}
-                          </Caption1>
-                        </div>
-                        {isEditing && (
-                          <div className={styles.widgetCardActions}>
-                            <Popover
-                              open={configuringWidgetId === item.i}
-                              onOpenChange={(_e, data) =>
-                                setConfiguringWidgetId(
-                                  data.open ? item.i : null
-                                )
-                              }
-                              positioning="below-end"
-                              trapFocus
-                            >
-                              <PopoverTrigger disableButtonEnhancement>
-                                <Button
-                                  appearance="subtle"
-                                  size="small"
-                                  icon={<ColorRegular />}
-                                  aria-label="Configure widget"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </PopoverTrigger>
-                              <PopoverSurface>
-                                <ColorConfigPanel
-                                  item={item}
-                                  onChange={(updates) =>
-                                    handleUpdateWidgetSettings(item.i, updates)
-                                  }
-                                  onClose={() => setConfiguringWidgetId(null)}
-                                />
-                              </PopoverSurface>
-                            </Popover>
-                            <Button
-                              appearance="subtle"
-                              size="small"
-                              icon={<DismissRegular />}
-                              aria-label="Remove widget"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoveWidget(item.i);
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className={styles.widgetCardBody}>
-                      {renderWidget(item, isEditing)}
-                    </div>
-                  </div>
-                );
-              })}
-            </GridLayout>
-          ) : null}
+          {surfaceContent}
         </div>
       </div>
 
@@ -1659,5 +1715,16 @@ function App() {
     </div>
   );
 }
+
+const cloneTreeWithNewIds = (node: LayoutNode): LayoutNode => {
+  if (node.type === "widget") {
+    return { ...node, id: generateId() };
+  }
+  return {
+    ...node,
+    id: generateId(),
+    children: node.children.map(cloneTreeWithNewIds),
+  };
+};
 
 export default App;
