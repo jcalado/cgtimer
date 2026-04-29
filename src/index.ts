@@ -238,6 +238,7 @@ const createWindow = (): void => {
           },
           {
             label: "Preferences",
+            accelerator: "CmdOrCtrl+,",
             click: () => {
               appSettings.show();
             },
@@ -372,6 +373,7 @@ ipcMain.on("layouts:update", (_event, layoutNames: string[]) => {
           },
           {
             label: "Preferences",
+            accelerator: "CmdOrCtrl+,",
             click: () => {
               appSettings.show();
             },
