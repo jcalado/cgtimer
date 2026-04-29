@@ -1686,7 +1686,11 @@ function App() {
             aria-label={loopAriaLabel}
             title={loopAriaLabel}
           >
-            {state.loop ? <ArrowRepeatAllRegular /> : <ProhibitedRegular />}
+            {state.loop ? (
+              <ArrowRepeatAllRegular className="loop-active" />
+            ) : (
+              <ProhibitedRegular />
+            )}
           </div>
         </div>
       );

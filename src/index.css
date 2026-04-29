@@ -78,6 +78,17 @@ body {
   animation: blink-animation 2s cubic-bezier(0.075, 0.82, 0.165, 1) infinite;
 }
 
+@keyframes loop-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loop-active {
+  animation: loop-spin 4s linear infinite;
+  transform-origin: 50% 50%;
+}
+
 @keyframes blink-animation {
   50% {
     opacity: 0;
