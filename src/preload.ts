@@ -3,6 +3,7 @@
 
 import { contextBridge, ipcRenderer, screen } from "electron";
 import type { StoreSchema } from "./store";
+import type { DisplayInfo } from "./shared/entities";
 
 export const api = {
     send: (channel: any, data: any) => {
@@ -22,7 +23,7 @@ export const electronAPI = {
     saveSettings: (settings: StoreSchema): Promise<void> =>
         ipcRenderer.invoke("settings:save", settings),
     resetSettings: (): Promise<StoreSchema> => ipcRenderer.invoke("settings:reset"),
-    getDisplays: (): Promise<Array<{ id: number; label: string }>> =>
+    getDisplays: (): Promise<DisplayInfo[]> =>
         ipcRenderer.invoke("displays:get"),
     onSettingsChange: (callback: (settings: StoreSchema) => void) => {
         ipcRenderer.on("settings:changed", (_, settings) => callback(settings));

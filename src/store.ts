@@ -2,6 +2,7 @@ import Store, { Schema } from "electron-store";
 import fs from "node:fs";
 import path from "node:path";
 import { app } from "electron";
+import { HyperDeck, TimezoneClock } from "./shared/entities";
 
 export interface StoreSchema {
   server: {
@@ -21,21 +22,10 @@ export interface StoreSchema {
     remaining: string;
   };
   timezones: {
-    clocks: Array<{
-      id: string;
-      label: string;
-      timezone: string;
-      enabled: boolean;
-    }>;
+    clocks: TimezoneClock[];
   };
   recorders: {
-    hyperdecks: Array<{
-      id: string;
-      label: string;
-      host: string;
-      port: number;
-      enabled: boolean;
-    }>;
+    hyperdecks: HyperDeck[];
   };
 }
 

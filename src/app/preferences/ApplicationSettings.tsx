@@ -7,6 +7,7 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
+import { DisplayInfo } from "../../shared/entities";
 
 const useStyles = makeStyles({
   section: {
@@ -19,11 +20,6 @@ const useStyles = makeStyles({
     maxWidth: "400px",
   },
 });
-
-interface Display {
-  id: number;
-  label: string;
-}
 
 interface ApplicationSettingsProps {
   display: number;
@@ -39,7 +35,7 @@ export const ApplicationSettings: React.FC<ApplicationSettingsProps> = ({
   onFullscreenChange,
 }) => {
   const styles = useStyles();
-  const [displays, setDisplays] = useState<Display[]>([]);
+  const [displays, setDisplays] = useState<DisplayInfo[]>([]);
 
   useEffect(() => {
     // Get displays from main process

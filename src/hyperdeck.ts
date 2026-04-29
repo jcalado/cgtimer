@@ -1,5 +1,6 @@
 import * as net from "node:net";
 import { EventEmitter } from "node:events";
+import { HyperDeck } from "./shared/entities";
 
 /**
  * Minimal client for the legacy Blackmagic HyperDeck text protocol on TCP/9993.
@@ -26,11 +27,7 @@ export type HyperDeckStatus =
   | "stopped"
   | "unknown";
 
-export type HyperDeckSnapshot = {
-  id: string;
-  label: string;
-  host: string;
-  port: number;
+export type HyperDeckSnapshot = Omit<HyperDeck, "enabled"> & {
   connected: boolean;
   lastError: string | null;
   status: HyperDeckStatus;

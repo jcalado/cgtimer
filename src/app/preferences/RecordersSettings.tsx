@@ -13,21 +13,15 @@ import {
   SettingsList,
   useSettingsListStyles,
 } from "../components/SettingsList";
-
-interface HyperDeck {
-  id: string;
-  label: string;
-  host: string;
-  port: number;
-  enabled: boolean;
-}
+import {
+  DEFAULT_HYPERDECK_PORT,
+  HyperDeck,
+} from "../../shared/entities";
 
 interface RecordersSettingsProps {
   hyperdecks: HyperDeck[];
   onChange: (hyperdecks: HyperDeck[]) => void;
 }
-
-const DEFAULT_PORT = 9993;
 
 export const RecordersSettings: React.FC<RecordersSettingsProps> = ({
   hyperdecks,
@@ -37,18 +31,18 @@ export const RecordersSettings: React.FC<RecordersSettingsProps> = ({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [host, setHost] = useState("");
-  const [port, setPort] = useState(String(DEFAULT_PORT));
+  const [port, setPort] = useState(String(DEFAULT_HYPERDECK_PORT));
 
   const reset = () => {
     setLabel("");
     setHost("");
-    setPort(String(DEFAULT_PORT));
+    setPort(String(DEFAULT_HYPERDECK_PORT));
   };
 
   const handleAdd = () => {
     const trimmedLabel = label.trim();
     const trimmedHost = host.trim();
-    const parsedPort = parseInt(port, 10) || DEFAULT_PORT;
+    const parsedPort = parseInt(port, 10) || DEFAULT_HYPERDECK_PORT;
     if (!trimmedLabel || !trimmedHost) return;
     onChange([
       ...hyperdecks,
