@@ -6,86 +6,94 @@ html {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
-  margin: auto;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  height: 100%;
+  margin: 0;
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #1e1e1e;
+}
+
+#app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .app {
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
-  align-items: center;
-  height: 100vh;
-  gap: 10px;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  gap: 12px;
   box-sizing: border-box;
-  padding: 10px 0;
-  user-select: none;
 }
 
 .monitor {
   flex: 1;
   background-color: #242424;
   height: 100%;
-  box-shadow: 0px 4px 5px rgb(22, 22, 22);
   position: relative;
-  padding: 0px 40px;
+  padding: 3cqh 0;
   display: flex;
   flex-direction: column;
+  container-type: size;
+  overflow: hidden;
+}
+
+/* When no label is rendered, drop the top spacing reserved for it and
+   center the clock face on the full widget height. */
+.monitor:not(:has(> h1)) {
+  padding: 0;
   justify-content: center;
 }
 
-.monitor.ending div {
-  animation: blink-red 1s linear infinite;
-  color: red;
-}
-
-.monitor.ending h1 + div {
-  color: #ff0000;
-}
-
-div > h1 + div {
-  font-size: clamp(1vh, 15vw, 20vh);
-  font-weight: bold;
+.monitor h1 {
+  font-size: clamp(14px, 8cqw, 8cqh);
   text-align: center;
-  margin: 0;
-  font-family: "led";
-  color: white;
-}
-
-div > h1 {
-  font-size: 1.5vw;
-  text-align: center;
-  font-weight: bolder;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   color: rgb(170, 170, 170);
   text-transform: uppercase;
   margin: 0;
-  margin-bottom: 20px;
+  padding: 0 4cqw;
 }
 
-@font-face {
-  font-family: led;
-  src: url(../src/assets//fonts/DSEG7Modern-Bold.ttf);
+.monitor .clock-face {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-family: "led";
   font-weight: bold;
+  line-height: 0.9;
+  text-align: center;
+  font-size: min(17cqw, 70cqh);
 }
 
-#loop {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  margin: 0;
-  color: #959595;
-  text-align: center;
-  font-size: 1em;
+.monitor.ending .clock-face {
+  color: red;
+  animation: blink-red 1s linear infinite;
 }
 
 .blink {
   animation: blink-animation 2s cubic-bezier(0.075, 0.82, 0.165, 1) infinite;
+}
+
+@keyframes loop-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loop-active {
+  animation: loop-spin 4s linear infinite;
+  transform-origin: 50% 50%;
 }
 
 @keyframes blink-animation {
@@ -97,18 +105,4 @@ div > h1 {
 .blinkred {
   animation: blink-animation 1s linear infinite;
   color: red;
-}
-
-.columns {
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-}
-
-.columns div > h1 + div {
-  font-size: clamp(1vh, 8vw, 20vh);
-}
-
-.flexi {
-  flex: 1;
 }

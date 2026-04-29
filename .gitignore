@@ -85,8 +85,11 @@ typings/
 # Webpack
 .webpack/
 
-# Vite
+# Vite (old Electron Forge build)
 .vite/
 
-# Electron-Forge
+# electron-vite output
 out/
+
+# electron-builder output
+dist/
