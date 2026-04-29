@@ -742,17 +742,16 @@ function toTime(seconds: number) {
   return new Date(seconds * 1000).toISOString().substr(11, 8);
 }
 
-function clockTime() {
-  const date = new Date();
+function clockTime(now: number) {
+  const date = new Date(now);
   const timeZoneOffset = date.getTimezoneOffset() * 60 * 1000;
   const timeZoneDate = new Date(date.getTime() - timeZoneOffset);
   return timeZoneDate.toISOString().substr(11, 8);
 }
 
-function getTimezoneTime(timezone: string): string {
+function getTimezoneTime(timezone: string, now: number): string {
   try {
-    const date = new Date();
-    const timeString = date.toLocaleString("en-US", {
+    const timeString = new Date(now).toLocaleString("en-US", {
       timeZone: timezone,
       hour12: false,
       hour: "2-digit",
@@ -820,7 +819,7 @@ function App() {
       return {};
     }
   });
-  const [currentTick, setCurrentTick] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [layouts, setLayouts] = useState<SavedLayout[]>(initialLayouts);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string>(
     initialLayouts[0]?.id ?? ""
@@ -999,12 +998,19 @@ function App() {
     };
   }, []);
 
+  // Single wall-clock-aligned 1Hz tick that drives every clock/timer in the UI.
   useEffect(() => {
-    const hasRunningTimer = Object.values(oscTimers).some((t) => t.startedAt !== null);
-    if (!hasRunningTimer) return;
-    const interval = setInterval(() => setCurrentTick(Date.now()), 100);
-    return () => clearInterval(interval);
-  }, [oscTimers]);
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const align = 1000 - (Date.now() % 1000);
+    const timeout = setTimeout(() => {
+      setNow(Date.now());
+      interval = setInterval(() => setNow(Date.now()), 1000);
+    }, align);
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1230,7 +1236,7 @@ function App() {
       const activeZone = selectedTimezone?.timezone ?? fallbackZone;
       const activeLabel = selectedTimezone?.label ?? fallbackZone;
       const defaultLabel = `${activeLabel} (${getTimezoneOffset(activeZone)})`;
-      const time = getTimezoneTime(activeZone);
+      const time = getTimezoneTime(activeZone, now);
 
       return (
         <div
@@ -1299,7 +1305,7 @@ function App() {
             className="clock-face"
             style={{ color: colors.faceColor ?? state.clockColor }}
           >
-            {clockTime()}
+            {clockTime(now)}
           </div>
         </div>
       );
@@ -1381,7 +1387,7 @@ function App() {
       const timerName = node.settings?.oscTimerName || "default";
       const timer = oscTimers[timerName] || { startedAt: null, elapsed: 0 };
       const displayTimeMs = timer.startedAt
-        ? timer.elapsed + (currentTick - timer.startedAt)
+        ? timer.elapsed + (now - timer.startedAt)
         : timer.elapsed;
       const displayTime = new Date(displayTimeMs).toISOString().substr(11, 8);
 

@@ -205,16 +205,20 @@ export const TimezoneSettings: React.FC<TimezoneSettingsProps> = ({
   };
 
   React.useEffect(() => {
-    if (dialogOpen) {
-      // Update immediately when dialog opens or timezone changes
+    if (!dialogOpen) return;
+    setPreviewTime(getTimezoneTime(newTimezone));
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const align = 1000 - (Date.now() % 1000);
+    const timeout = setTimeout(() => {
       setPreviewTime(getTimezoneTime(newTimezone));
-
-      // Then update every second
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         setPreviewTime(getTimezoneTime(newTimezone));
       }, 1000);
-      return () => clearInterval(interval);
-    }
+    }, align);
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
   }, [dialogOpen, newTimezone]);
 
   return (
