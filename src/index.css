@@ -66,7 +66,7 @@ body {
   font-weight: bold;
   line-height: 0.9;
   text-align: center;
-  font-size: min(24cqw, 32cqh);
+  font-size: min(19cqw, 40cqh);
 }
 
 .monitor.ending .clock-face {
