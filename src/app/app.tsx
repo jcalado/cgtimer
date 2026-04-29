@@ -843,6 +843,7 @@ function App() {
   const [renameTargetId, setRenameTargetId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [saveAsValue, setSaveAsValue] = useState("");
 
   useEffect(() => {
@@ -853,6 +854,42 @@ function App() {
     window.api.receive("window:fullscreen-state", fullscreenListener);
     return () => {
       window.api.removeListener("window:fullscreen-state", fullscreenListener);
+    };
+  }, []);
+
+  // Auto-hide the window menu bar after 3s of mouse/keyboard inactivity;
+  // any movement re-shows it. macOS uses a system-level menu bar so this
+  // toggle is a no-op there and we skip it.
+  useEffect(() => {
+    const isMac =
+      typeof navigator !== "undefined" &&
+      /mac/i.test(navigator.platform || navigator.userAgent || "");
+    if (isMac) return;
+
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    let visible = true;
+    window.api.send("menubar:set-visible", true);
+
+    const ping = () => {
+      if (!visible) {
+        window.api.send("menubar:set-visible", true);
+        visible = true;
+      }
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        window.api.send("menubar:set-visible", false);
+        visible = false;
+      }, 3000);
+    };
+
+    ping();
+    window.addEventListener("mousemove", ping);
+    window.addEventListener("keydown", ping);
+    return () => {
+      window.removeEventListener("mousemove", ping);
+      window.removeEventListener("keydown", ping);
+      if (idleTimer) clearTimeout(idleTimer);
+      window.api.send("menubar:set-visible", true);
     };
   }, []);
 
@@ -1213,12 +1250,21 @@ function App() {
 
   const handleRenameCancel = () => setRenameTargetId(null);
 
-  const handleDeleteLayout = () => {
+  const handleRequestDelete = () => {
     if (!selectedLayout) return;
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!selectedLayout) {
+      setDeleteConfirmOpen(false);
+      return;
+    }
     const filtered = layouts.filter((layout) => layout.id !== selectedLayout.id);
     const nextLayouts = filtered.length ? filtered : [createDefaultLayout()];
     setLayouts(nextLayouts);
     setSelectedLayoutId(nextLayouts[0]?.id ?? "");
+    setDeleteConfirmOpen(false);
   };
 
   const renderWidgetBody = (node: WidgetNode, isEditing: boolean) => {
@@ -1634,7 +1680,7 @@ function App() {
       <Button
         appearance="subtle"
         icon={<DeleteRegular />}
-        onClick={handleDeleteLayout}
+        onClick={handleRequestDelete}
       >
         Delete layout
       </Button>
@@ -1650,7 +1696,6 @@ function App() {
           >
             <Button
               appearance="secondary"
-              icon={<AddRegular />}
               onClick={() => handleAddWidget(widget.key)}
             >
               {widget.label}
@@ -1725,6 +1770,35 @@ function App() {
         onSubmit={handleSaveAsSubmit}
         onCancel={() => setSaveAsOpen(false)}
       />
+
+      <Dialog
+        open={deleteConfirmOpen}
+        onOpenChange={(_e, data) => {
+          if (!data.open) setDeleteConfirmOpen(false);
+        }}
+      >
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>Delete layout?</DialogTitle>
+            <DialogContent>
+              {selectedLayout
+                ? `"${selectedLayout.name}" will be permanently removed.`
+                : "This layout will be permanently removed."}
+            </DialogContent>
+            <DialogActions>
+              <Button
+                appearance="secondary"
+                onClick={() => setDeleteConfirmOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button appearance="primary" onClick={handleConfirmDelete}>
+                Delete
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </div>
   );
 }

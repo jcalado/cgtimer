@@ -143,7 +143,7 @@ const createWindow = (): void => {
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
     },
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
   });
 
   moveWindowToPreferredDisplay(mainWindow);
@@ -346,6 +346,10 @@ ipcMain.handle("displays:get", () => {
 
 ipcMain.on("preferences:open", (_event, tab?: string) => {
   appSettings.show(tab);
+});
+
+ipcMain.on("menubar:set-visible", (_event, visible: boolean) => {
+  mainWindow?.setMenuBarVisibility(!!visible);
 });
 
 ipcMain.on("layouts:update", (_event, layoutNames: string[]) => {
