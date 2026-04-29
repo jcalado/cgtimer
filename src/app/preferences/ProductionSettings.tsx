@@ -1,5 +1,7 @@
 import React from "react";
 import {
+  Body1Strong,
+  Caption1,
   Field,
   Input,
   Switch,
@@ -16,6 +18,21 @@ const useStyles = makeStyles({
   },
   field: {
     maxWidth: "400px",
+  },
+  toggleRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    columnGap: tokens.spacingHorizontalL,
+    maxWidth: "400px",
+  },
+  toggleText: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: tokens.spacingVerticalXXS,
+  },
+  toggleHint: {
+    color: tokens.colorNeutralForeground3,
   },
 });
 
@@ -49,16 +66,18 @@ export const ProductionSettings: React.FC<ProductionSettingsProps> = ({
 
   return (
     <div className={styles.section}>
-      <Field
-        label="Enable production clock"
-        hint="Splits the clock into live and production clocks"
-        className={styles.field}
-      >
+      <label className={styles.toggleRow}>
+        <span className={styles.toggleText}>
+          <Body1Strong>Enable production clock</Body1Strong>
+          <Caption1 className={styles.toggleHint}>
+            Splits the clock into live and production clocks
+          </Caption1>
+        </span>
         <Switch
           checked={enable}
           onChange={(_, data) => onEnableChange(data.checked)}
         />
-      </Field>
+      </label>
 
       {(enable || ontime) && (
         <>
@@ -98,16 +117,18 @@ export const ProductionSettings: React.FC<ProductionSettingsProps> = ({
         </>
       )}
 
-      <Field
-        label="Use ontime"
-        hint="Use ontime for production clock management"
-        className={styles.field}
-      >
+      <label className={styles.toggleRow}>
+        <span className={styles.toggleText}>
+          <Body1Strong>Use ontime</Body1Strong>
+          <Caption1 className={styles.toggleHint}>
+            Use ontime for production clock management
+          </Caption1>
+        </span>
         <Switch
           checked={ontime}
           onChange={(_, data) => onOntimeChange(data.checked)}
         />
-      </Field>
+      </label>
     </div>
   );
 };
