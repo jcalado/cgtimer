@@ -87,7 +87,8 @@ type WidgetKind =
   | "ontimeTitle"
   | "ontimePlayback"
   | "ontimeOnAir"
-  | "ontimeExpectedFinish";
+  | "ontimeExpectedFinish"
+  | "recorderStatus";
 
 type WidgetSettings = {
   timezoneId?: string;
@@ -98,9 +99,10 @@ type WidgetSettings = {
   customLabel?: string;
   oscTimerName?: string;
   targetTime?: string; // HH:MM:SS for timeOfDayCountdown
+  recorderId?: string; // hyperdeck id for recorderStatus
 };
 
-type WidgetGroup = "clocks" | "playback" | "timers" | "ontime";
+type WidgetGroup = "clocks" | "playback" | "timers" | "ontime" | "recorders";
 
 type WidgetDefinition = {
   key: WidgetKind;
@@ -116,6 +118,7 @@ const WIDGET_GROUPS: { id: WidgetGroup; label: string }[] = [
   { id: "playback", label: "Playback" },
   { id: "timers", label: "Timers" },
   { id: "ontime", label: "Ontime" },
+  { id: "recorders", label: "Recorders" },
 ];
 
 type WidgetNode = {
@@ -246,6 +249,14 @@ const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     icon: <FlagRegular />,
     color: "#f97316",
     group: "ontime",
+  },
+  recorderStatus: {
+    key: "recorderStatus",
+    label: "HyperDeck Recorder",
+    description: "Recording status of a Blackmagic HyperDeck",
+    icon: <RecordRegular />,
+    color: "#dc2626",
+    group: "recorders",
   },
 };
 
@@ -1078,6 +1089,19 @@ function App() {
     elapsedColor: "",
     remainingColor: "",
     clockColor: "",
+    recorders: [] as Array<{
+      id: string;
+      label: string;
+      host: string;
+      port: number;
+      connected: boolean;
+      lastError: string | null;
+      status: string;
+      recordingSince: number | null;
+      displayTimecode: string;
+      videoFormat: string;
+      clipId: string;
+    }>,
     timezoneClocks: [] as Array<{
       id: string;
       label: string;
@@ -1261,6 +1285,7 @@ function App() {
         elapsedColor: "",
         remainingColor: "",
         clockColor: "",
+        recorders: [],
         timezoneClocks: [],
       });
     };
@@ -1504,6 +1529,10 @@ function App() {
     }
     if (widgetKey === "timeOfDayCountdown") {
       return { targetTime: "20:00:00" };
+    }
+    if (widgetKey === "recorderStatus") {
+      const first = state.recorders[0];
+      return { recorderId: first?.id };
     }
     return undefined;
   };
@@ -2078,6 +2107,84 @@ function App() {
             style={{ color: colors.faceColor ?? state.clockColor }}
           >
             {display}
+          </div>
+        </div>
+      );
+    }
+
+    if (node.widgetKey === "recorderStatus") {
+      const recorders = state.recorders;
+      const recorder =
+        recorders.find((r) => r.id === node.settings?.recorderId) ||
+        recorders[0];
+      const recording = recorder?.status === "record";
+      const elapsedMs = recording && recorder?.recordingSince
+        ? Math.max(0, now - recorder.recordingSince)
+        : 0;
+      const display = recording
+        ? Utils.msToTime(elapsedMs)
+        : recorder
+        ? recorder.connected
+          ? "STBY"
+          : "OFFLINE"
+        : "—";
+      const labelText =
+        customLabel || recorder?.label || "HyperDeck";
+      const faceColor = recording
+        ? "#dc2626"
+        : recorder && !recorder.connected
+        ? "#888"
+        : state.clockColor;
+
+      return (
+        <div
+          className={`monitor${recording ? " ending" : ""}`}
+          style={
+            colors.backgroundColor ? { backgroundColor: colors.backgroundColor } : undefined
+          }
+        >
+          {isEditing && (
+            <div className={styles.widgetControl}>
+              <Dropdown
+                size="small"
+                value={recorder?.label ?? "Pick a recorder"}
+                selectedOptions={[recorder?.id ?? ""]}
+                onOptionSelect={(_e, data) => {
+                  if (data.optionValue === "__manage__") {
+                    window.api.send("preferences:open", "recorders");
+                    return;
+                  }
+                  handleUpdateWidgetSettings(node.id, {
+                    recorderId: data.optionValue || undefined,
+                  });
+                }}
+              >
+                {recorders.map((r) => (
+                  <Option key={r.id} value={r.id} text={r.label}>
+                    {r.label}
+                  </Option>
+                ))}
+                <Option value="__manage__" text="Manage recorders…">
+                  Manage recorders…
+                </Option>
+              </Dropdown>
+            </div>
+          )}
+          {showLabel && (
+            <h1 style={colors.labelColor ? { color: colors.labelColor } : undefined}>
+              {labelText}
+            </h1>
+          )}
+          <div
+            className="clock-face"
+            style={{
+              color: colors.faceColor ?? faceColor,
+              fontSize: recording ? undefined : "min(12cqw, 30cqh)",
+              fontFamily: recording ? undefined : "inherit",
+              letterSpacing: recording ? undefined : "0.1em",
+            }}
+          >
+            {recording ? `● ${display}` : display}
           </div>
         </div>
       );

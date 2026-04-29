@@ -28,6 +28,15 @@ export interface StoreSchema {
       enabled: boolean;
     }>;
   };
+  recorders: {
+    hyperdecks: Array<{
+      id: string;
+      label: string;
+      host: string;
+      port: number;
+      enabled: boolean;
+    }>;
+  };
 }
 
 const schema: Schema<StoreSchema> = {
@@ -111,6 +120,26 @@ const schema: Schema<StoreSchema> = {
       }
     }
   },
+  recorders: {
+    type: "object",
+    properties: {
+      hyperdecks: {
+        type: "array",
+        default: [],
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            label: { type: "string" },
+            host: { type: "string" },
+            port: { type: "number" },
+            enabled: { type: "boolean" },
+          },
+          required: ["id", "label", "host", "port", "enabled"],
+        },
+      },
+    },
+  },
 };
 
 // Default values for the store
@@ -133,6 +162,9 @@ const defaults: StoreSchema = {
   },
   timezones: {
     clocks: [],
+  },
+  recorders: {
+    hyperdecks: [],
   },
 };
 

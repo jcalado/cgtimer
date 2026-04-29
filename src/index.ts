@@ -5,6 +5,7 @@ import settings, { getDisplays } from './settings';
 import oscListener from "./osc";
 import store from "./store";
 import type { StoreSchema } from "./store";
+import { HyperDeckClient, HyperDeckSnapshot } from "./hyperdeck";
 
 
 // In development, electron-vite sets ELECTRON_RENDERER_URL environment variable
@@ -16,6 +17,44 @@ const appSettings = new settings();
 let mainWindow: BrowserWindow | null = null;
 let timer: NodeJS.Timeout;
 let layoutShortcuts: string[] = [];
+const hyperdeckClients = new Map<string, HyperDeckClient>();
+
+const reconcileHyperDecks = () => {
+  const desired = (store.get("recorders.hyperdecks") || []).filter(
+    (r) => r.enabled && r.host && r.port
+  );
+  const desiredById = new Map(desired.map((r) => [r.id, r]));
+
+  // Stop clients that are no longer wanted or have changed connection params.
+  for (const [id, client] of hyperdeckClients) {
+    const wanted = desiredById.get(id);
+    if (
+      !wanted ||
+      wanted.host !== client.host ||
+      wanted.port !== client.port ||
+      wanted.label !== client.label
+    ) {
+      client.stop();
+      hyperdeckClients.delete(id);
+    }
+  }
+
+  // Start clients for any new entries.
+  for (const recorder of desired) {
+    if (hyperdeckClients.has(recorder.id)) continue;
+    const client = new HyperDeckClient(recorder);
+    hyperdeckClients.set(recorder.id, client);
+    client.start();
+  }
+};
+
+const collectHyperDeckSnapshots = (): HyperDeckSnapshot[] => {
+  const list: HyperDeckSnapshot[] = [];
+  for (const client of hyperdeckClients.values()) {
+    list.push(client.snapshot());
+  }
+  return list;
+};
 
 const getDisplayOrigin = (display: Display) => {
   if (display.bounds) {
@@ -235,6 +274,8 @@ const createWindow = (): void => {
 
   Menu.setApplicationMenu(buildMenu());
 
+  reconcileHyperDecks();
+
   timer = setInterval(() => {
     mainWindow?.webContents.send("timers:update", {
       currentTime: osc.currentTime,
@@ -251,6 +292,7 @@ const createWindow = (): void => {
       remainingColor: store.get("colors.remaining"),
       clockColor: store.get("colors.clock"),
       timezoneClocks: store.get("timezones.clocks") || [],
+      recorders: collectHyperDeckSnapshots(),
     });
   }, 200);
 };
@@ -262,6 +304,7 @@ ipcMain.handle("settings:get", (): StoreSchema => {
     application: store.get("application"),
     colors: store.get("colors"),
     timezones: store.get("timezones"),
+    recorders: store.get("recorders"),
   };
 });
 
@@ -270,6 +313,9 @@ ipcMain.handle("settings:save", (_, settings: StoreSchema) => {
   store.set("application", settings.application);
   store.set("colors", settings.colors);
   store.set("timezones", settings.timezones);
+  store.set("recorders", settings.recorders);
+
+  reconcileHyperDecks();
 
   // Refresh the display signature so a freshly-picked monitor can be
   // re-matched after a disconnect even if its id changes.
@@ -294,6 +340,7 @@ ipcMain.handle("settings:reset", (): StoreSchema => {
     application: store.get("application"),
     colors: store.get("colors"),
     timezones: store.get("timezones"),
+    recorders: store.get("recorders"),
   };
 });
 

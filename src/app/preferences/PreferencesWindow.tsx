@@ -14,11 +14,13 @@ import {
   AppGenericRegular,
   ClockRegular,
   ColorRegular,
+  RecordRegular,
 } from "@fluentui/react-icons";
 import { ServerSettings } from "./ServerSettings";
 import { ApplicationSettings } from "./ApplicationSettings";
 import { ColorSettings } from "./ColorSettings";
 import { TimezoneSettings } from "./TimezoneSettings";
+import { RecordersSettings } from "./RecordersSettings";
 import type { StoreSchema } from "../../store";
 
 const useStyles = makeStyles({
@@ -66,13 +68,19 @@ const useStyles = makeStyles({
   },
 });
 
-type TabValue = "server" | "application" | "colors" | "timezones";
+type TabValue =
+  | "server"
+  | "application"
+  | "colors"
+  | "timezones"
+  | "recorders";
 
 const TAB_VALUES: TabValue[] = [
   "server",
   "application",
   "colors",
   "timezones",
+  "recorders",
 ];
 
 const isTabValue = (value: string): value is TabValue =>
@@ -114,6 +122,7 @@ export const PreferencesWindow: React.FC = () => {
           loadedSettings?.colors ||
           { clock: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
         timezones: loadedSettings?.timezones || { clocks: [] },
+        recorders: loadedSettings?.recorders || { hyperdecks: [] },
       });
     }).catch((error) => {
       console.error("Error loading settings:", error);
@@ -122,6 +131,7 @@ export const PreferencesWindow: React.FC = () => {
         application: { display: 0, displayLabel: "", displayX: 0, displayY: 0, fullscreen: false },
         colors: { clock: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
         timezones: { clocks: [] },
+        recorders: { hyperdecks: [] },
       });
     });
   }, []);
@@ -198,6 +208,9 @@ export const PreferencesWindow: React.FC = () => {
               <Tab value="timezones" icon={<ClockRegular />}>
                 Timezones
               </Tab>
+              <Tab value="recorders" icon={<RecordRegular />}>
+                Recorders
+              </Tab>
             </TabList>
           </div>
 
@@ -248,6 +261,15 @@ export const PreferencesWindow: React.FC = () => {
                 clocks={settings.timezones.clocks}
                 clockColor={settings.colors.clock}
                 onChange={(clocks) => updateSetting("timezones", "clocks", clocks)}
+              />
+            )}
+
+            {selectedTab === "recorders" && (
+              <RecordersSettings
+                hyperdecks={settings.recorders.hyperdecks}
+                onChange={(hyperdecks) =>
+                  updateSetting("recorders", "hyperdecks", hyperdecks)
+                }
               />
             )}
           </div>
