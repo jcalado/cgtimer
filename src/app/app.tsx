@@ -864,8 +864,10 @@ const ColorConfigPanel = ({ node, onChange, onClose }: ColorConfigPanelProps) =>
         />
       </div>
 
-      <Field label="Custom label">
+      <div className={styles.configRow}>
+        <Caption1>Custom label</Caption1>
         <Input
+          size="small"
           value={customLabel}
           placeholder="Default"
           disabled={!showLabel}
@@ -873,7 +875,7 @@ const ColorConfigPanel = ({ node, onChange, onClose }: ColorConfigPanelProps) =>
             onChange({ customLabel: data.value || undefined })
           }
         />
-      </Field>
+      </div>
 
       <div className={styles.configRow}>
         <Caption1>Label color</Caption1>
@@ -887,7 +889,7 @@ const ColorConfigPanel = ({ node, onChange, onClose }: ColorConfigPanelProps) =>
       </div>
 
       <div className={styles.configRow}>
-        <Caption1>Clock face</Caption1>
+        <Caption1>Foreground</Caption1>
         <input
           type="color"
           className={styles.colorSwatchInput}
