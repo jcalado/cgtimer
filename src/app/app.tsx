@@ -2191,7 +2191,10 @@ function App() {
           )}
           <div
             className="clock-face"
-            style={{ color: colors.faceColor ?? state.clockColor }}
+            style={{
+              color: colors.faceColor ?? state.clockColor,
+              paddingBottom: "6cqh",
+            }}
           >
             {display}
           </div>
