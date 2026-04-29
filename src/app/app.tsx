@@ -630,12 +630,12 @@ const useStyles = makeStyles({
     flexDirection: "column",
     overflow: "hidden",
     backgroundColor: tokens.colorNeutralBackground1,
-    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
+    boxShadow: `inset 0 0 0 1px ${tokens.colorNeutralStroke2}`,
     ...shorthands.borderRadius(tokens.borderRadiusMedium),
   },
   widgetCardDisplay: {
     backgroundColor: "transparent",
-    ...shorthands.borderStyle("none"),
+    boxShadow: "none",
   },
   widgetCardHeader: {
     display: "flex",
