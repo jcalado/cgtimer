@@ -494,7 +494,10 @@ const createDefaultLayout = (): SavedLayout => ({
   id: generateId(),
   name: "Untitled",
   updatedAt: Date.now(),
-  root: null,
+  root: makeSplit("vertical", [
+    makeWidget("primaryTimer"),
+    makeWidget("secondaryTimer"),
+  ]),
 });
 
 const useStyles = makeStyles({
