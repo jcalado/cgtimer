@@ -6,8 +6,6 @@ import {
   DragStartEvent,
   DragEndEvent,
   PointerSensor,
-  useDraggable,
-  useDroppable,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -43,8 +41,6 @@ import {
 import {
   AddRegular,
   ArrowRepeatAllRegular,
-  CalendarClockRegular,
-  ClockRegular,
   ColorRegular,
   CopyRegular,
   DeleteRegular,
@@ -52,18 +48,11 @@ import {
   DocumentAddRegular,
   EditRegular,
   EyeRegular,
-  FlagRegular,
   FullScreenMaximizeRegular,
   FullScreenMinimizeRegular,
-  GlobeRegular,
-  HistoryRegular,
-  HourglassRegular,
   PauseRegular,
   PlayRegular,
-  PlayCircleRegular,
-  PlugConnectedRegular,
   ProhibitedRegular,
-  PulseRegular,
   RecordRegular,
   ReOrderRegular,
   RenameRegular,
@@ -71,437 +60,47 @@ import {
   SplitHorizontalRegular,
   SplitVerticalRegular,
   StopRegular,
-  TextFontRegular,
 } from "@fluentui/react-icons";
 import { Utils } from "../utils";
 import { MonitorWidget } from "./components/MonitorWidget";
-import { ConfigRow } from "./components/ConfigRow";
-import { ColorSwatchInput } from "./components/ColorSwatchInput";
-
-type WidgetKind =
-  | "worldClock"
-  | "localClock"
-  | "primaryTimer"
-  | "secondaryTimer"
-  | "timeOfDayCountdown"
-  | "loopState"
-  | "oscTimer"
-  | "ontimeTimer"
-  | "ontimeTitle"
-  | "ontimePlayback"
-  | "ontimeOnAir"
-  | "ontimeExpectedFinish"
-  | "recorderStatus";
-
-type WidgetSettings = {
-  timezoneId?: string;
-  labelColor?: string;
-  faceColor?: string;
-  backgroundColor?: string;
-  showLabel?: boolean;
-  customLabel?: string;
-  oscTimerName?: string;
-  targetTime?: string; // HH:MM:SS for timeOfDayCountdown
-  recorderId?: string; // hyperdeck id for recorderStatus
-};
-
-type WidgetGroup = "clocks" | "playback" | "timers" | "ontime" | "recorders";
-
-type WidgetDefinition = {
-  key: WidgetKind;
-  label: string;
-  description: string;
-  icon: React.ReactElement;
-  color: string;
-  group: WidgetGroup;
-};
-
-const WIDGET_GROUPS: { id: WidgetGroup; label: string }[] = [
-  { id: "clocks", label: "Clocks" },
-  { id: "playback", label: "Playback" },
-  { id: "timers", label: "Timers" },
-  { id: "ontime", label: "Ontime" },
-  { id: "recorders", label: "Recorders" },
-];
-
-type WidgetNode = {
-  type: "widget";
-  id: string;
-  widgetKey: WidgetKind;
-  settings?: WidgetSettings;
-};
-
-type SplitNode = {
-  type: "split";
-  id: string;
-  direction: "horizontal" | "vertical";
-  sizes: number[];
-  children: LayoutNode[];
-};
-
-type LayoutNode = WidgetNode | SplitNode;
-
-type SavedLayout = {
-  id: string;
-  name: string;
-  root: LayoutNode | null;
-  updatedAt: number;
-};
+import { PromptDialog } from "./components/PromptDialog";
+import { Draggable, DragData } from "./components/Draggable";
+import { Droppable } from "./components/Droppable";
+import { ColorConfigPanel, getWidgetColors } from "./components/ColorConfigPanel";
+import {
+  Edge,
+  LayoutNode,
+  SavedLayout,
+  WidgetKind,
+  WidgetNode,
+  WidgetSettings,
+} from "./lib/layout-types";
+import {
+  appendToRoot,
+  cloneTreeWithNewIds,
+  collectWidgetIds,
+  findWidget,
+  generateId,
+  insertAtEdge,
+  makeWidget,
+  removeNode,
+  splitWidgetAt,
+  updateSplitSizes,
+  updateWidgetSettings,
+} from "./lib/layout-tree";
+import {
+  createDefaultLayout,
+  loadSavedLayouts,
+  persistLayouts,
+} from "./lib/layout-storage";
+import { WIDGET_GROUPS, widgetCatalog } from "./lib/widget-catalog";
 
 type OscTimerState = {
   startedAt: number | null;
   elapsed: number;
 };
 
-const STORAGE_KEY = "cgtimer.widgetLayouts.v2";
 const RESIZE_HANDLE_PX = 6;
-
-const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
-  worldClock: {
-    key: "worldClock",
-    label: "World Clock",
-    description: "Pick a configured timezone and pin it here",
-    icon: <GlobeRegular />,
-    color: "#3b82f6",
-    group: "clocks",
-  },
-  localClock: {
-    key: "localClock",
-    label: "Local Clock",
-    description: "Shows the local system time",
-    icon: <ClockRegular />,
-    color: "#14b8a6",
-    group: "clocks",
-  },
-  primaryTimer: {
-    key: "primaryTimer",
-    label: "Remaining Timer",
-    description: "Shows remaining time",
-    icon: <HourglassRegular />,
-    color: "#f59e0b",
-    group: "playback",
-  },
-  secondaryTimer: {
-    key: "secondaryTimer",
-    label: "Elapsed Timer",
-    description: "Shows elapsed time",
-    icon: <HistoryRegular />,
-    color: "#22c55e",
-    group: "playback",
-  },
-  loopState: {
-    key: "loopState",
-    label: "Loop State",
-    description: "Quick indicator for loop mode",
-    icon: <ArrowRepeatAllRegular />,
-    color: "#a855f7",
-    group: "playback",
-  },
-  timeOfDayCountdown: {
-    key: "timeOfDayCountdown",
-    label: "Time-of-day Countdown",
-    description: "Counts down to a target wall-clock time",
-    icon: <CalendarClockRegular />,
-    color: "#ef4444",
-    group: "timers",
-  },
-  oscTimer: {
-    key: "oscTimer",
-    label: "OSC Timer",
-    description: "Stopwatch triggered via OSC commands",
-    icon: <PulseRegular />,
-    color: "#ec4899",
-    group: "timers",
-  },
-  ontimeTimer: {
-    key: "ontimeTimer",
-    label: "Ontime Timer",
-    description: "Mirrors the current timer from Ontime over OSC",
-    icon: <PlugConnectedRegular />,
-    color: "#10b981",
-    group: "ontime",
-  },
-  ontimeTitle: {
-    key: "ontimeTitle",
-    label: "Ontime Title",
-    description: "Title of the currently running Ontime event",
-    icon: <TextFontRegular />,
-    color: "#0ea5e9",
-    group: "ontime",
-  },
-  ontimePlayback: {
-    key: "ontimePlayback",
-    label: "Ontime Playback",
-    description: "Ontime playback state (play, pause, stop, roll, armed)",
-    icon: <PlayCircleRegular />,
-    color: "#84cc16",
-    group: "ontime",
-  },
-  ontimeOnAir: {
-    key: "ontimeOnAir",
-    label: "Ontime On-Air",
-    description: "On-air indicator from Ontime",
-    icon: <RecordRegular />,
-    color: "#dc2626",
-    group: "ontime",
-  },
-  ontimeExpectedFinish: {
-    key: "ontimeExpectedFinish",
-    label: "Ontime Expected Finish",
-    description: "Wall-clock time the current Ontime event is expected to end",
-    icon: <FlagRegular />,
-    color: "#f97316",
-    group: "ontime",
-  },
-  recorderStatus: {
-    key: "recorderStatus",
-    label: "HyperDeck Recorder",
-    description: "Recording status of a Blackmagic HyperDeck",
-    icon: <RecordRegular />,
-    color: "#dc2626",
-    group: "recorders",
-  },
-};
-
-const generateId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2, 10);
-
-const equalSizes = (count: number): number[] =>
-  Array.from({ length: count }, () => 100 / count);
-
-const makeWidget = (
-  widgetKey: WidgetKind,
-  settings?: WidgetSettings
-): WidgetNode => ({
-  type: "widget",
-  id: generateId(),
-  widgetKey,
-  settings,
-});
-
-const makeSplit = (
-  direction: "horizontal" | "vertical",
-  children: LayoutNode[]
-): SplitNode => ({
-  type: "split",
-  id: generateId(),
-  direction,
-  sizes: equalSizes(children.length),
-  children,
-});
-
-const findParent = (
-  root: LayoutNode | null,
-  childId: string
-): { parent: SplitNode; index: number } | null => {
-  if (!root || root.type !== "split") return null;
-  const idx = root.children.findIndex((c) => c.id === childId);
-  if (idx >= 0) return { parent: root, index: idx };
-  for (const child of root.children) {
-    const hit = findParent(child, childId);
-    if (hit) return hit;
-  }
-  return null;
-};
-
-const collapse = (node: LayoutNode): LayoutNode => {
-  if (node.type === "widget") return node;
-  const collapsedChildren = node.children.map(collapse);
-  if (collapsedChildren.length === 1) return collapsedChildren[0];
-  // Flatten same-direction nested splits to avoid degenerate trees
-  const flattened: LayoutNode[] = [];
-  const flattenedSizes: number[] = [];
-  collapsedChildren.forEach((child, i) => {
-    if (
-      child.type === "split" &&
-      child.direction === node.direction &&
-      child.children.length > 0
-    ) {
-      const parentShare = node.sizes[i] ?? 100 / collapsedChildren.length;
-      child.children.forEach((grand, gi) => {
-        flattened.push(grand);
-        const grandShare = child.sizes[gi] ?? 100 / child.children.length;
-        flattenedSizes.push((parentShare * grandShare) / 100);
-      });
-    } else {
-      flattened.push(child);
-      flattenedSizes.push(node.sizes[i] ?? 100 / collapsedChildren.length);
-    }
-  });
-  return { ...node, children: flattened, sizes: flattenedSizes };
-};
-
-const removeNode = (
-  root: LayoutNode | null,
-  targetId: string
-): LayoutNode | null => {
-  if (!root) return null;
-  if (root.id === targetId) return null;
-  if (root.type === "widget") return root;
-  const filtered: LayoutNode[] = [];
-  const filteredSizes: number[] = [];
-  root.children.forEach((child, i) => {
-    if (child.id === targetId) return;
-    const reduced = removeNode(child, targetId);
-    if (reduced) {
-      filtered.push(reduced);
-      filteredSizes.push(root.sizes[i] ?? 100 / root.children.length);
-    }
-  });
-  if (filtered.length === 0) return null;
-  // Renormalize sizes to sum 100
-  const total = filteredSizes.reduce((a, b) => a + b, 0) || 1;
-  const normalized = filteredSizes.map((s) => (s * 100) / total);
-  const next: SplitNode = { ...root, children: filtered, sizes: normalized };
-  return collapse(next);
-};
-
-const splitWidgetAt = (
-  root: LayoutNode | null,
-  targetId: string,
-  direction: "horizontal" | "vertical",
-  position: "before" | "after",
-  newWidget: WidgetNode
-): LayoutNode | null => {
-  if (!root) return newWidget;
-  if (root.id === targetId && root.type === "widget") {
-    const children =
-      position === "after" ? [root, newWidget] : [newWidget, root];
-    return makeSplit(direction, children);
-  }
-  if (root.type === "widget") return root;
-  const hit = root.children.findIndex((c) => c.id === targetId);
-  if (hit >= 0 && root.direction === direction) {
-    // Insert as sibling in same-direction parent
-    const insertAt = position === "after" ? hit + 1 : hit;
-    const newChildren = [...root.children];
-    newChildren.splice(insertAt, 0, newWidget);
-    return { ...root, children: newChildren, sizes: equalSizes(newChildren.length) };
-  }
-  // Recurse
-  const newChildren = root.children.map((c) =>
-    splitWidgetAt(c, targetId, direction, position, newWidget)
-  );
-  return { ...root, children: newChildren as LayoutNode[] };
-};
-
-const appendToRoot = (
-  root: LayoutNode | null,
-  newWidget: WidgetNode,
-  direction: "horizontal" | "vertical" = "horizontal"
-): LayoutNode => {
-  if (!root) return newWidget;
-  if (root.type === "split" && root.direction === direction) {
-    const children = [...root.children, newWidget];
-    return { ...root, children, sizes: equalSizes(children.length) };
-  }
-  return makeSplit(direction, [root, newWidget]);
-};
-
-type Edge = "left" | "right" | "top" | "bottom";
-
-const edgeToSplit = (
-  edge: Edge
-): { direction: "horizontal" | "vertical"; position: "before" | "after" } => {
-  switch (edge) {
-    case "left":
-      return { direction: "horizontal", position: "before" };
-    case "right":
-      return { direction: "horizontal", position: "after" };
-    case "top":
-      return { direction: "vertical", position: "before" };
-    case "bottom":
-      return { direction: "vertical", position: "after" };
-  }
-};
-
-const insertAtEdge = (
-  root: LayoutNode | null,
-  targetId: string,
-  edge: Edge,
-  newWidget: WidgetNode
-): LayoutNode | null => {
-  const { direction, position } = edgeToSplit(edge);
-  return splitWidgetAt(root, targetId, direction, position, newWidget);
-};
-
-const findWidget = (root: LayoutNode | null, id: string): WidgetNode | null => {
-  if (!root) return null;
-  if (root.type === "widget") return root.id === id ? root : null;
-  for (const child of root.children) {
-    const hit = findWidget(child, id);
-    if (hit) return hit;
-  }
-  return null;
-};
-
-const updateWidgetSettings = (
-  root: LayoutNode | null,
-  targetId: string,
-  patch: WidgetSettings
-): LayoutNode | null => {
-  if (!root) return null;
-  if (root.type === "widget") {
-    if (root.id !== targetId) return root;
-    return { ...root, settings: { ...root.settings, ...patch } };
-  }
-  return {
-    ...root,
-    children: root.children.map(
-      (c) => updateWidgetSettings(c, targetId, patch) as LayoutNode
-    ),
-  };
-};
-
-const updateSplitSizes = (
-  root: LayoutNode | null,
-  splitId: string,
-  sizes: number[]
-): LayoutNode | null => {
-  if (!root || root.type === "widget") return root;
-  if (root.id === splitId) return { ...root, sizes };
-  return {
-    ...root,
-    children: root.children.map(
-      (c) => updateSplitSizes(c, splitId, sizes) as LayoutNode
-    ),
-  };
-};
-
-const collectWidgetIds = (root: LayoutNode | null): string[] => {
-  if (!root) return [];
-  if (root.type === "widget") return [root.id];
-  return root.children.flatMap(collectWidgetIds);
-};
-
-const loadSavedLayouts = (): SavedLayout[] => {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as SavedLayout[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const persistLayouts = (layouts: SavedLayout[]) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts));
-};
-
-const createDefaultLayout = (): SavedLayout => ({
-  id: generateId(),
-  name: "Untitled",
-  updatedAt: Date.now(),
-  root: makeSplit("vertical", [
-    makeWidget("primaryTimer"),
-    makeWidget("secondaryTimer"),
-  ]),
-});
 
 const useStyles = makeStyles({
   layoutPanel: {
@@ -768,231 +367,13 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     boxShadow: tokens.shadow16,
   },
-  configPopover: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalS,
-    minWidth: "260px",
-  },
-  configFooter: {
-    display: "flex",
-    justifyContent: "space-between",
-    columnGap: tokens.spacingHorizontalS,
-    paddingTop: tokens.spacingVerticalXS,
-  },
   fullscreenButton: {
     position: "absolute",
     bottom: tokens.spacingVerticalL,
     right: tokens.spacingHorizontalL,
     zIndex: 9999,
   },
-  promptField: {
-    width: "100%",
-  },
 });
-
-const PromptDialog = ({
-  open,
-  title,
-  message,
-  value,
-  confirmLabel = "OK",
-  cancelLabel = "Cancel",
-  onChange,
-  onSubmit,
-  onCancel,
-}: {
-  open: boolean;
-  title: string;
-  message?: string;
-  value: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-}) => {
-  const styles = useStyles();
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(_e, data) => {
-        if (!data.open) onCancel();
-      }}
-    >
-      <DialogSurface>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit();
-          }}
-        >
-          <DialogBody>
-            <DialogTitle>{title}</DialogTitle>
-            <DialogContent>
-              <Field label={message} className={styles.promptField}>
-                <Input
-                  autoFocus
-                  value={value}
-                  onChange={(_e, data) => onChange(data.value)}
-                />
-              </Field>
-            </DialogContent>
-            <DialogActions>
-              <Button appearance="secondary" type="button" onClick={onCancel}>
-                {cancelLabel}
-              </Button>
-              <Button appearance="primary" type="submit">
-                {confirmLabel}
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </form>
-      </DialogSurface>
-    </Dialog>
-  );
-};
-
-type DragData =
-  | { kind: "palette"; widgetKey: WidgetKind; label: string }
-  | { kind: "move"; widgetId: string; widgetKey: WidgetKind; label: string };
-
-type DraggableProps = {
-  id: string;
-  data: DragData;
-  className?: string;
-  children: React.ReactNode;
-  asLabel?: boolean;
-};
-
-const Draggable: React.FC<DraggableProps> = ({
-  id,
-  data,
-  className,
-  children,
-}) => {
-  const { attributes, listeners, setNodeRef } = useDraggable({ id, data });
-  return (
-    <div ref={setNodeRef} className={className} {...listeners} {...attributes}>
-      {children}
-    </div>
-  );
-};
-
-type DroppableProps = {
-  id: string;
-  className?: string;
-  activeClassName?: string;
-  children?: React.ReactNode;
-};
-
-const Droppable: React.FC<DroppableProps> = ({
-  id,
-  className,
-  activeClassName,
-  children,
-}) => {
-  const { isOver, setNodeRef } = useDroppable({ id });
-  const merged =
-    isOver && activeClassName
-      ? mergeClasses(className, activeClassName)
-      : className;
-  return (
-    <div ref={setNodeRef} className={merged}>
-      {children}
-    </div>
-  );
-};
-
-const getWidgetColors = (
-  settings?: WidgetSettings
-): { labelColor?: string; faceColor?: string; backgroundColor?: string } => ({
-  labelColor: settings?.labelColor || undefined,
-  faceColor: settings?.faceColor || undefined,
-  backgroundColor: settings?.backgroundColor || undefined,
-});
-
-type ColorConfigPanelProps = {
-  node: WidgetNode;
-  onChange: (updates: WidgetSettings) => void;
-  onClose: () => void;
-};
-
-const ColorConfigPanel = ({ node, onChange, onClose }: ColorConfigPanelProps) => {
-  const styles = useStyles();
-  const colors = getWidgetColors(node.settings);
-  const showLabel = node.settings?.showLabel !== false;
-  const customLabel = node.settings?.customLabel ?? "";
-
-  const handleReset = () => {
-    onChange({
-      labelColor: undefined,
-      faceColor: undefined,
-      backgroundColor: undefined,
-      showLabel: true,
-      customLabel: undefined,
-    });
-  };
-
-  return (
-    <div className={styles.configPopover}>
-      <Body1Strong>Widget settings</Body1Strong>
-
-      <ConfigRow label="Show label">
-        <Switch
-          checked={showLabel}
-          onChange={(_e, data) => onChange({ showLabel: data.checked })}
-        />
-      </ConfigRow>
-
-      <ConfigRow label="Custom label">
-        <Input
-          size="small"
-          value={customLabel}
-          placeholder="Default"
-          disabled={!showLabel}
-          onChange={(_e, data) =>
-            onChange({ customLabel: data.value || undefined })
-          }
-        />
-      </ConfigRow>
-
-      <ConfigRow label="Label color">
-        <ColorSwatchInput
-          value={colors.labelColor}
-          defaultValue="#aaaaaa"
-          onChange={(value) => onChange({ labelColor: value })}
-          disabled={!showLabel}
-        />
-      </ConfigRow>
-
-      <ConfigRow label="Foreground">
-        <ColorSwatchInput
-          value={colors.faceColor}
-          defaultValue="#e5e9ff"
-          onChange={(value) => onChange({ faceColor: value })}
-        />
-      </ConfigRow>
-
-      <ConfigRow label="Background">
-        <ColorSwatchInput
-          value={colors.backgroundColor}
-          defaultValue="#242424"
-          onChange={(value) => onChange({ backgroundColor: value })}
-        />
-      </ConfigRow>
-
-      <div className={styles.configFooter}>
-        <Button appearance="subtle" onClick={handleReset}>
-          Reset
-        </Button>
-        <Button appearance="primary" onClick={onClose}>
-          Done
-        </Button>
-      </div>
-    </div>
-  );
-};
 
 function toTime(seconds: number) {
   return new Date(seconds * 1000).toISOString().substr(11, 8);
@@ -2498,16 +1879,5 @@ function App() {
     </div>
   );
 }
-
-const cloneTreeWithNewIds = (node: LayoutNode): LayoutNode => {
-  if (node.type === "widget") {
-    return { ...node, id: generateId() };
-  }
-  return {
-    ...node,
-    id: generateId(),
-    children: node.children.map(cloneTreeWithNewIds),
-  };
-};
 
 export default App;
