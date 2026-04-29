@@ -4238,15 +4238,10 @@ jsonfile@^6.0.1:
   optionalDependencies:
     graceful-fs "^4.1.6"
 
-keyborg@2.6.0:
+keyborg@2.6.0, keyborg@^2.6.0:
   version "2.6.0"
   resolved "https://registry.yarnpkg.com/keyborg/-/keyborg-2.6.0.tgz#ebfcaaed2f517f9295058ff5d57d14e71958ab5a"
   integrity sha512-o5kvLbuTF+o326CMVYpjlaykxqYP9DphFQZ2ZpgrvBouyvOxyEB7oqe8nOLFpiV5VCtz0D3pt8gXQYWpLpBnmA==
-
-keyborg@^2.6.0:
-  version "2.14.0"
-  resolved "https://registry.yarnpkg.com/keyborg/-/keyborg-2.14.0.tgz#4931be79a19f76ba4d7217d523f58eda56dcc98f"
-  integrity sha512-xSGCnMK6jZJQnFvUr4tUGsSAHVfdOH0gCXqMLOEams0+nOMvVs4BEguDecLq7zbPNvf9I7C7M98vTg7x4x2Z1Q==
 
 keyv@^4.0.0, keyv@^4.5.4:
   version "4.5.4"
@@ -4333,11 +4328,6 @@ lru-cache@^6.0.0:
   integrity sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==
   dependencies:
     yallist "^4.0.0"
-
-lucide-react@^1.12.0:
-  version "1.12.0"
-  resolved "https://registry.yarnpkg.com/lucide-react/-/lucide-react-1.12.0.tgz#2b333995985c55ead048c29491466af78d9dc4c2"
-  integrity sha512-rTKR3RN6HIAxdNZALoPvqxd64vjL9nTThU0JF9q1Qg8yUnmo1r+d8baN72YNVK3RGxUmzBzbd77IWJq/fkm+Xw==
 
 magic-string@^0.30.19:
   version "0.30.21"
