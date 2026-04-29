@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import {
+  DndContext,
+  DragOverlay,
+  DragStartEvent,
+  DragEndEvent,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
   Body1Strong,
   Button,
   Caption1,
@@ -291,6 +302,43 @@ const appendToRoot = (
   return makeSplit(direction, [root, newWidget]);
 };
 
+type Edge = "left" | "right" | "top" | "bottom";
+
+const edgeToSplit = (
+  edge: Edge
+): { direction: "horizontal" | "vertical"; position: "before" | "after" } => {
+  switch (edge) {
+    case "left":
+      return { direction: "horizontal", position: "before" };
+    case "right":
+      return { direction: "horizontal", position: "after" };
+    case "top":
+      return { direction: "vertical", position: "before" };
+    case "bottom":
+      return { direction: "vertical", position: "after" };
+  }
+};
+
+const insertAtEdge = (
+  root: LayoutNode | null,
+  targetId: string,
+  edge: Edge,
+  newWidget: WidgetNode
+): LayoutNode | null => {
+  const { direction, position } = edgeToSplit(edge);
+  return splitWidgetAt(root, targetId, direction, position, newWidget);
+};
+
+const findWidget = (root: LayoutNode | null, id: string): WidgetNode | null => {
+  if (!root) return null;
+  if (root.type === "widget") return root.id === id ? root : null;
+  for (const child of root.children) {
+    const hit = findWidget(child, id);
+    if (hit) return hit;
+  }
+  return null;
+};
+
 const updateWidgetSettings = (
   root: LayoutNode | null,
   targetId: string,
@@ -510,6 +558,81 @@ const useStyles = makeStyles({
     alignItems: "center",
     columnGap: "2px",
   },
+  widgetCardHeaderDraggable: {
+    cursor: "grab",
+    ":active": { cursor: "grabbing" },
+  },
+  dropZoneOverlay: {
+    position: "absolute",
+    inset: 0,
+    pointerEvents: "none",
+    zIndex: 4,
+  },
+  dropZone: {
+    position: "absolute",
+    pointerEvents: "auto",
+    backgroundColor: "transparent",
+    transitionProperty: "background-color",
+    transitionDuration: tokens.durationFaster,
+  },
+  dropZoneLeft: {
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: "25%",
+  },
+  dropZoneRight: {
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: "25%",
+  },
+  dropZoneTop: {
+    left: "25%",
+    right: "25%",
+    top: 0,
+    height: "50%",
+  },
+  dropZoneBottom: {
+    left: "25%",
+    right: "25%",
+    bottom: 0,
+    height: "50%",
+  },
+  dropZoneActive: {
+    backgroundColor: tokens.colorBrandBackground2,
+    outline: `2px solid ${tokens.colorBrandStroke1}`,
+    outlineOffset: "-2px",
+  },
+  rootDropZone: {
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: tokens.colorNeutralForeground3,
+    ...shorthands.border("2px", "dashed", tokens.colorNeutralStroke2),
+    ...shorthands.borderRadius(tokens.borderRadiusMedium),
+    transitionProperty: "background-color, border-color",
+    transitionDuration: tokens.durationFaster,
+  },
+  rootDropZoneActive: {
+    backgroundColor: tokens.colorBrandBackground2,
+    borderColor: tokens.colorBrandStroke1,
+    color: tokens.colorBrandForeground1,
+  },
+  dragOverlayChip: {
+    backgroundColor: tokens.colorNeutralBackground1,
+    color: tokens.colorNeutralForeground1,
+    ...shorthands.border("1px", "solid", tokens.colorNeutralStroke1),
+    ...shorthands.borderRadius(tokens.borderRadiusMedium),
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    paddingTop: tokens.spacingVerticalXS,
+    paddingBottom: tokens.spacingVerticalXS,
+    fontSize: tokens.fontSizeBase200,
+    boxShadow: tokens.shadow16,
+  },
   widgetControl: {
     display: "flex",
     alignItems: "center",
@@ -617,6 +740,57 @@ const PromptDialog = ({
         </form>
       </DialogSurface>
     </Dialog>
+  );
+};
+
+type DragData =
+  | { kind: "palette"; widgetKey: WidgetKind; label: string }
+  | { kind: "move"; widgetId: string; widgetKey: WidgetKind; label: string };
+
+type DraggableProps = {
+  id: string;
+  data: DragData;
+  className?: string;
+  children: React.ReactNode;
+  asLabel?: boolean;
+};
+
+const Draggable: React.FC<DraggableProps> = ({
+  id,
+  data,
+  className,
+  children,
+}) => {
+  const { attributes, listeners, setNodeRef } = useDraggable({ id, data });
+  return (
+    <div ref={setNodeRef} className={className} {...listeners} {...attributes}>
+      {children}
+    </div>
+  );
+};
+
+type DroppableProps = {
+  id: string;
+  className?: string;
+  activeClassName?: string;
+  children?: React.ReactNode;
+};
+
+const Droppable: React.FC<DroppableProps> = ({
+  id,
+  className,
+  activeClassName,
+  children,
+}) => {
+  const { isOver, setNodeRef } = useDroppable({ id });
+  const merged =
+    isOver && activeClassName
+      ? mergeClasses(className, activeClassName)
+      : className;
+  return (
+    <div ref={setNodeRef} className={merged}>
+      {children}
+    </div>
   );
 };
 
@@ -850,6 +1024,63 @@ function App() {
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [saveAsValue, setSaveAsValue] = useState("");
+  const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const data = event.active.data.current as DragData | undefined;
+    if (data) setActiveDrag(data);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDrag(null);
+    const data = event.active.data.current as DragData | undefined;
+    const overId = event.over?.id;
+    if (!data || !overId) return;
+
+    if (overId === "root") {
+      // Empty-layout drop: only valid for palette additions
+      if (data.kind === "palette") {
+        setDraftRoot(makeWidget(data.widgetKey, buildDefaultSettings(data.widgetKey)));
+      }
+      return;
+    }
+
+    const match = String(overId).match(/^edge:([^:]+):(left|right|top|bottom)$/);
+    if (!match) return;
+    const [, targetId, edge] = match;
+    if (data.kind === "move" && data.widgetId === targetId) return;
+
+    if (data.kind === "palette") {
+      setDraftRoot((prev) =>
+        insertAtEdge(
+          prev,
+          targetId,
+          edge as Edge,
+          makeWidget(data.widgetKey, buildDefaultSettings(data.widgetKey))
+        )
+      );
+      return;
+    }
+
+    // move existing widget
+    setDraftRoot((prev) => {
+      const sourceWidget = findWidget(prev, data.widgetId);
+      if (!sourceWidget) return prev;
+      const withoutSource = removeNode(prev, data.widgetId);
+      // Target may have collapsed; ensure it still exists
+      if (!findWidget(withoutSource, targetId)) {
+        // Fallback: append to root
+        return appendToRoot(withoutSource, { ...sourceWidget });
+      }
+      return insertAtEdge(withoutSource, targetId, edge as Edge, {
+        ...sourceWidget,
+      });
+    });
+  };
 
   useEffect(() => {
     window.api.send("window:get-fullscreen-state");
@@ -873,13 +1104,11 @@ function App() {
 
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
     let visible = true;
+    let lastX = -1;
+    let lastY = -1;
     window.api.send("menubar:set-visible", true);
 
-    const ping = () => {
-      if (!visible) {
-        window.api.send("menubar:set-visible", true);
-        visible = true;
-      }
+    const armIdle = () => {
       if (idleTimer) clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
         window.api.send("menubar:set-visible", false);
@@ -887,12 +1116,34 @@ function App() {
       }, 3000);
     };
 
-    ping();
-    window.addEventListener("mousemove", ping);
-    window.addEventListener("keydown", ping);
+    const handleMouseMove = (event: MouseEvent) => {
+      // Hiding the menu bar reflows the window, which fires a synthetic
+      // mousemove with the same client coordinates. Ignore it so the bar
+      // doesn't reappear without real user motion.
+      if (event.clientX === lastX && event.clientY === lastY) return;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      if (!visible) {
+        window.api.send("menubar:set-visible", true);
+        visible = true;
+      }
+      armIdle();
+    };
+
+    const handleKey = () => {
+      if (!visible) {
+        window.api.send("menubar:set-visible", true);
+        visible = true;
+      }
+      armIdle();
+    };
+
+    armIdle();
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("keydown", handleKey);
     return () => {
-      window.removeEventListener("mousemove", ping);
-      window.removeEventListener("keydown", ping);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("keydown", handleKey);
       if (idleTimer) clearTimeout(idleTimer);
       window.api.send("menubar:set-visible", true);
     };
@@ -1485,115 +1736,163 @@ function App() {
 
   const renderWidget = (node: WidgetNode) => {
     const widget = widgetCatalog[node.widgetKey];
+    const widgetLabel = widget?.label ?? "Widget";
+
+    const titleBlock = (
+      <div>
+        <Body1Strong className={styles.widgetCardTitle}>{widgetLabel}</Body1Strong>
+        <Caption1 className={styles.widgetCardSubtitle} block>
+          {widget?.description}
+        </Caption1>
+      </div>
+    );
+
+    const actions = isEditing ? (
+      <div className={styles.widgetCardActions}>
+        <Menu>
+          <MenuTrigger disableButtonEnhancement>
+            <Tooltip content="Split right" relationship="label" withArrow>
+              <Button
+                appearance="subtle"
+                size="small"
+                icon={<SplitVerticalRegular />}
+                aria-label="Split right"
+              />
+            </Tooltip>
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              {Object.values(widgetCatalog).map((w) => (
+                <MenuItem
+                  key={w.key}
+                  onClick={() => handleSplitWidget(node.id, "horizontal", w.key)}
+                >
+                  {w.label}
+                </MenuItem>
+              ))}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+        <Menu>
+          <MenuTrigger disableButtonEnhancement>
+            <Tooltip content="Split down" relationship="label" withArrow>
+              <Button
+                appearance="subtle"
+                size="small"
+                icon={<SplitHorizontalRegular />}
+                aria-label="Split down"
+              />
+            </Tooltip>
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              {Object.values(widgetCatalog).map((w) => (
+                <MenuItem
+                  key={w.key}
+                  onClick={() => handleSplitWidget(node.id, "vertical", w.key)}
+                >
+                  {w.label}
+                </MenuItem>
+              ))}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+        <Popover
+          open={configuringWidgetId === node.id}
+          onOpenChange={(_e, data) =>
+            setConfiguringWidgetId(data.open ? node.id : null)
+          }
+          positioning="below-end"
+          trapFocus
+        >
+          <PopoverTrigger disableButtonEnhancement>
+            <Button
+              appearance="subtle"
+              size="small"
+              icon={<ColorRegular />}
+              aria-label="Configure widget"
+            />
+          </PopoverTrigger>
+          <PopoverSurface>
+            <ColorConfigPanel
+              node={node}
+              onChange={(updates) => handleUpdateWidgetSettings(node.id, updates)}
+              onClose={() => setConfiguringWidgetId(null)}
+            />
+          </PopoverSurface>
+        </Popover>
+        <Button
+          appearance="subtle"
+          size="small"
+          icon={<DismissRegular />}
+          aria-label="Remove widget"
+          onClick={() => handleRemoveWidget(node.id)}
+        />
+      </div>
+    ) : null;
+
+    const header = isEditing ? (
+      <Draggable
+        id={`move:${node.id}`}
+        data={{
+          kind: "move",
+          widgetId: node.id,
+          widgetKey: node.widgetKey,
+          label: widgetLabel,
+        }}
+        className={mergeClasses(
+          styles.widgetCardHeader,
+          styles.widgetCardHeaderDraggable
+        )}
+      >
+        {titleBlock}
+        {actions}
+      </Draggable>
+    ) : (
+      <div className={styles.widgetCardHeader}>
+        {titleBlock}
+        {actions}
+      </div>
+    );
+
+    const isDragSource =
+      activeDrag?.kind === "move" && activeDrag.widgetId === node.id;
+    const dropZonesActive = isEditing && !!activeDrag && !isDragSource;
+
     return (
       <div
         className={mergeClasses(
           styles.widgetCard,
           !showEditor && styles.widgetCardDisplay
         )}
+        style={{ position: "relative" }}
       >
-        {showEditor && (
-          <div className={styles.widgetCardHeader}>
-            <div>
-              <Body1Strong className={styles.widgetCardTitle}>
-                {widget?.label ?? "Widget"}
-              </Body1Strong>
-              <Caption1 className={styles.widgetCardSubtitle} block>
-                {widget?.description}
-              </Caption1>
-            </div>
-            {isEditing && (
-              <div className={styles.widgetCardActions}>
-                <Menu>
-                  <MenuTrigger disableButtonEnhancement>
-                    <Tooltip content="Split right" relationship="label" withArrow>
-                      <Button
-                        appearance="subtle"
-                        size="small"
-                        icon={<SplitVerticalRegular />}
-                        aria-label="Split right"
-                      />
-                    </Tooltip>
-                  </MenuTrigger>
-                  <MenuPopover>
-                    <MenuList>
-                      {Object.values(widgetCatalog).map((widget) => (
-                        <MenuItem
-                          key={widget.key}
-                          onClick={() =>
-                            handleSplitWidget(node.id, "horizontal", widget.key)
-                          }
-                        >
-                          {widget.label}
-                        </MenuItem>
-                      ))}
-                    </MenuList>
-                  </MenuPopover>
-                </Menu>
-                <Menu>
-                  <MenuTrigger disableButtonEnhancement>
-                    <Tooltip content="Split down" relationship="label" withArrow>
-                      <Button
-                        appearance="subtle"
-                        size="small"
-                        icon={<SplitHorizontalRegular />}
-                        aria-label="Split down"
-                      />
-                    </Tooltip>
-                  </MenuTrigger>
-                  <MenuPopover>
-                    <MenuList>
-                      {Object.values(widgetCatalog).map((widget) => (
-                        <MenuItem
-                          key={widget.key}
-                          onClick={() =>
-                            handleSplitWidget(node.id, "vertical", widget.key)
-                          }
-                        >
-                          {widget.label}
-                        </MenuItem>
-                      ))}
-                    </MenuList>
-                  </MenuPopover>
-                </Menu>
-                <Popover
-                  open={configuringWidgetId === node.id}
-                  onOpenChange={(_e, data) =>
-                    setConfiguringWidgetId(data.open ? node.id : null)
-                  }
-                  positioning="below-end"
-                  trapFocus
-                >
-                  <PopoverTrigger disableButtonEnhancement>
-                    <Button
-                      appearance="subtle"
-                      size="small"
-                      icon={<ColorRegular />}
-                      aria-label="Configure widget"
-                    />
-                  </PopoverTrigger>
-                  <PopoverSurface>
-                    <ColorConfigPanel
-                      node={node}
-                      onChange={(updates) =>
-                        handleUpdateWidgetSettings(node.id, updates)
-                      }
-                      onClose={() => setConfiguringWidgetId(null)}
-                    />
-                  </PopoverSurface>
-                </Popover>
-                <Button
-                  appearance="subtle"
-                  size="small"
-                  icon={<DismissRegular />}
-                  aria-label="Remove widget"
-                  onClick={() => handleRemoveWidget(node.id)}
-                />
-              </div>
-            )}
+        {showEditor && header}
+        <div className={styles.widgetCardBody}>{renderWidgetBody(node, isEditing)}</div>
+        {dropZonesActive && (
+          <div className={styles.dropZoneOverlay}>
+            <Droppable
+              id={`edge:${node.id}:left`}
+              className={mergeClasses(styles.dropZone, styles.dropZoneLeft)}
+              activeClassName={styles.dropZoneActive}
+            />
+            <Droppable
+              id={`edge:${node.id}:right`}
+              className={mergeClasses(styles.dropZone, styles.dropZoneRight)}
+              activeClassName={styles.dropZoneActive}
+            />
+            <Droppable
+              id={`edge:${node.id}:top`}
+              className={mergeClasses(styles.dropZone, styles.dropZoneTop)}
+              activeClassName={styles.dropZoneActive}
+            />
+            <Droppable
+              id={`edge:${node.id}:bottom`}
+              className={mergeClasses(styles.dropZone, styles.dropZoneBottom)}
+              activeClassName={styles.dropZoneActive}
+            />
           </div>
         )}
-        <div className={styles.widgetCardBody}>{renderWidgetBody(node, isEditing)}</div>
       </div>
     );
   };
@@ -1634,10 +1933,20 @@ function App() {
 
   const surfaceContent =
     draftRoot === null ? (
-      <div className={styles.emptySurface}>
-        <Body1Strong>No widgets in this layout</Body1Strong>
-        <Caption1>Use the dock to add a widget.</Caption1>
-      </div>
+      isEditing && activeDrag ? (
+        <Droppable
+          id="root"
+          className={styles.rootDropZone}
+          activeClassName={styles.rootDropZoneActive}
+        >
+          <Body1Strong>Drop here to add</Body1Strong>
+        </Droppable>
+      ) : (
+        <div className={styles.emptySurface}>
+          <Body1Strong>No widgets in this layout</Body1Strong>
+          <Caption1>Use the dock to add a widget.</Caption1>
+        </div>
+      )
     ) : draftRoot.type === "widget" ? (
       // Single-widget root: wrap in a single-panel group so resizing semantics stay consistent
       <PanelGroup direction="horizontal" style={{ flex: 1, minHeight: 0 }}>
@@ -1723,19 +2032,28 @@ function App() {
       <Caption1 className={styles.paletteHeading}>Add widget</Caption1>
       <div className={styles.dockButtonRowSingle}>
         {Object.values(widgetCatalog).map((widget) => (
-          <Tooltip
+          <Draggable
             key={widget.key}
-            content={widget.description}
-            relationship="description"
-            withArrow
+            id={`palette:${widget.key}`}
+            data={{
+              kind: "palette",
+              widgetKey: widget.key,
+              label: widget.label,
+            }}
           >
-            <Button
-              appearance="secondary"
-              onClick={() => handleAddWidget(widget.key)}
+            <Tooltip
+              content={`${widget.description} — click or drag onto a widget edge`}
+              relationship="description"
+              withArrow
             >
-              {widget.label}
-            </Button>
-          </Tooltip>
+              <Button
+                appearance="secondary"
+                onClick={() => handleAddWidget(widget.key)}
+              >
+                {widget.label}
+              </Button>
+            </Tooltip>
+          </Draggable>
         ))}
       </div>
 
@@ -1774,15 +2092,30 @@ function App() {
         </div>
       )}
 
-      <div className={styles.layoutPanel}>
-        {showEditor && renderDock()}
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveDrag(null)}
+      >
+        <div className={styles.layoutPanel}>
+          {showEditor && renderDock()}
 
-        <div
-          className={mergeClasses(styles.surface, showEditor && styles.surfaceEditing)}
-        >
-          {surfaceContent}
+          <div
+            className={mergeClasses(
+              styles.surface,
+              showEditor && styles.surfaceEditing
+            )}
+          >
+            {surfaceContent}
+          </div>
         </div>
-      </div>
+        <DragOverlay dropAnimation={null}>
+          {activeDrag ? (
+            <div className={styles.dragOverlayChip}>{activeDrag.label}</div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       <PromptDialog
         open={!!renameTargetId}
