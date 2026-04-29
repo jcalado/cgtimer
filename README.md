@@ -10,6 +10,9 @@ widgets you need, save the layout, and pull it up live during a show.
 If you are using CGTimer, share some pictures and I'll open a gallery on the
 wiki — [code@jcalado.com](mailto:code@jcalado.com).
 
+> ☕ **Like CGTimer?** Buying me a coffee at
+> [ko-fi.com/jcalado](https://ko-fi.com/jcalado) keeps the features coming.
+
 ## Screenshot
 
 <img src="screenshots/main.png" width="800px" alt="CGTimer dashboard"/>
