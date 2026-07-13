@@ -124,6 +124,18 @@ and `/meters` and renews automatically; channel names, mute states and
 fader levels come straight from the desk, so relabeling a channel on the
 console updates the dashboard.
 
+### Widget setup guidance
+
+In edit mode, every widget card has a `?` button next to the split and
+color actions. It opens a help dialog with what the widget shows, how to
+read its states, the live status of its data source (never configured,
+configured but silent, offline, or pointing at a deleted
+timezone/recorder, with a "last packet" line for OSC sources), and
+numbered setup steps with an Open settings button that jumps to the
+right Preferences tab. When the source needs attention, the `?` icon is
+tinted amber (setup needed) or red (offline / broken reference). Run
+mode is unaffected.
+
 ### Layout editor
 
 In edit mode (toggle from the dock), drag widgets from the palette onto an

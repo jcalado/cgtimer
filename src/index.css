@@ -81,6 +81,12 @@ body {
   animation: blink-red 1s linear infinite;
 }
 
+@keyframes blink-red {
+  50% {
+    opacity: 0.15;
+  }
+}
+
 .blink {
   animation: blink-animation 2s cubic-bezier(0.075, 0.82, 0.165, 1) infinite;
 }

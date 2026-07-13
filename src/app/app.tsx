@@ -52,6 +52,7 @@ import {
   PauseRegular,
   PlayRegular,
   ProhibitedRegular,
+  QuestionCircleRegular,
   RecordRegular,
   ReOrderRegular,
   RenameRegular,
@@ -66,6 +67,15 @@ import { PromptDialog } from "./components/PromptDialog";
 import { Draggable, DragData } from "./components/Draggable";
 import { Droppable } from "./components/Droppable";
 import { ColorConfigPanel, getWidgetColors } from "./components/ColorConfigPanel";
+import { WidgetHelpDialog } from "./components/WidgetHelpDialog";
+import {
+  ReadinessState,
+  formatLastData,
+  getWidgetReadiness,
+  integrationHelp,
+  interpolate,
+  sourceTelemetry,
+} from "./lib/widget-readiness";
 import {
   Edge,
   LayoutNode,
@@ -407,6 +417,13 @@ function App() {
     ccgFormat: "",
     ccgFramerate: 0,
     displayValues: {} as Record<string, string>,
+    sources: {
+      ccgOsc: { lastSeenAt: 0, lastSender: "" },
+      ontime: { lastSeenAt: 0, lastSender: "" },
+      oscTimer: { lastSeenAt: 0, lastSender: "" },
+      display: { lastSeenAt: 0, lastSender: "" },
+      oscPort: 0,
+    },
     casparcg: {
       enabled: false,
       connected: false,
@@ -473,6 +490,7 @@ function App() {
   );
   const layoutsRef = useRef<SavedLayout[]>(initialLayouts);
   const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null);
+  const [helpWidgetId, setHelpWidgetId] = useState<string | null>(null);
   const [mode, setMode] = useState<"edit" | "preview">("preview");
   const [showEditor, setShowEditor] = useState(false);
   const [dockState, setDockState] = useState(() => {
@@ -631,6 +649,13 @@ function App() {
         ccgFormat: "",
         ccgFramerate: 0,
         displayValues: {},
+        sources: {
+          ccgOsc: { lastSeenAt: 0, lastSender: "" },
+          ontime: { lastSeenAt: 0, lastSender: "" },
+          oscTimer: { lastSeenAt: 0, lastSender: "" },
+          display: { lastSeenAt: 0, lastSender: "" },
+          oscPort: 0,
+        },
         casparcg: {
           enabled: false,
           connected: false,
@@ -755,7 +780,10 @@ function App() {
   }, [layouts]);
 
   useEffect(() => {
-    if (mode !== "edit" || !showEditor) setConfiguringWidgetId(null);
+    if (mode !== "edit" || !showEditor) {
+      setConfiguringWidgetId(null);
+      setHelpWidgetId(null);
+    }
   }, [mode, showEditor]);
 
   useEffect(() => {
@@ -926,6 +954,7 @@ function App() {
 
   const handleRemoveWidget = (id: string) => {
     if (configuringWidgetId === id) setConfiguringWidgetId(null);
+    if (helpWidgetId === id) setHelpWidgetId(null);
     setDraftRoot((prev) => removeNode(prev, id));
   };
 
@@ -1108,6 +1137,89 @@ function App() {
     );
   };
 
+  const renderTimezonePicker = (node: WidgetNode) => {
+    const timezones = state.timezoneClocks;
+    const selectedTimezone = timezones.find(
+      (tz) => tz.id === node.settings?.timezoneId
+    );
+    return (
+      <Dropdown
+        size="small"
+        value={selectedTimezone?.label ?? "Local time"}
+        selectedOptions={[selectedTimezone?.id ?? ""]}
+        onOptionSelect={(_e, data) => {
+          if (data.optionValue === "__manage__") {
+            window.api.send("preferences:open", "timezones");
+            return;
+          }
+          handleUpdateWidgetSettings(node.id, {
+            timezoneId: data.optionValue || undefined,
+          });
+        }}
+      >
+        <Option value="">Local time</Option>
+        {timezones.map((tz) => (
+          <Option key={tz.id} value={tz.id} text={tz.label}>
+            {tz.label}
+          </Option>
+        ))}
+        <Option value="__manage__" text="Manage timezones…">
+          Manage timezones…
+        </Option>
+      </Dropdown>
+    );
+  };
+
+  const renderTargetTimeInput = (node: WidgetNode) => (
+    <Input
+      size="small"
+      value={node.settings?.targetTime || "20:00:00"}
+      placeholder="HH:MM:SS"
+      onChange={(_e, data) =>
+        handleUpdateWidgetSettings(node.id, {
+          targetTime: data.value || undefined,
+        })
+      }
+    />
+  );
+
+  const renderOscTimerNameInput = (node: WidgetNode) => (
+    <Input
+      size="small"
+      value={node.settings?.oscTimerName || "default"}
+      placeholder="default"
+      onChange={(_e, data) =>
+        handleUpdateWidgetSettings(node.id, {
+          oscTimerName: data.value || undefined,
+        })
+      }
+    />
+  );
+
+  const renderDisplayKeyInput = (node: WidgetNode) => (
+    <Input
+      size="small"
+      value={node.settings?.displayKey || "value"}
+      placeholder="key"
+      onChange={(_e, data) =>
+        handleUpdateWidgetSettings(node.id, {
+          displayKey: data.value || undefined,
+        })
+      }
+    />
+  );
+
+  const readinessState: ReadinessState = {
+    now,
+    sources: state.sources,
+    casparcg: state.casparcg,
+    x32: state.x32,
+    recorders: state.recorders,
+    timezoneClocks: state.timezoneClocks,
+    displayValues: state.displayValues,
+    oscTimerNames: Object.keys(oscTimers),
+  };
+
   const renderWidgetBody = (node: WidgetNode, isEditing: boolean) => {
     const widget = widgetCatalog[node.widgetKey];
     const colors = getWidgetColors(node.settings);
@@ -1115,15 +1227,27 @@ function App() {
     const customLabel = node.settings?.customLabel;
     if (!widget) return <div>Unknown widget</div>;
 
+
     if (node.widgetKey === "worldClock") {
       const timezones = state.timezoneClocks;
-      const fallbackZone = "UTC";
-      const selectedTimezone =
-        timezones.find((tz) => tz.id === node.settings?.timezoneId) || timezones[0];
-      const activeZone = selectedTimezone?.timezone ?? fallbackZone;
-      const activeLabel = selectedTimezone?.label ?? fallbackZone;
-      const defaultLabel = `${activeLabel} (${getTimezoneOffset(activeZone)})`;
-      const time = getTimezoneTime(activeZone, now);
+      // No timezoneId is the explicit "Local time" choice; a set id that no
+      // longer exists is a broken reference (previously it silently showed
+      // the first configured zone).
+      const wantsLocal = !node.settings?.timezoneId;
+      const selectedTimezone = wantsLocal
+        ? undefined
+        : timezones.find((tz) => tz.id === node.settings?.timezoneId);
+      const broken = !wantsLocal && !selectedTimezone;
+      const defaultLabel = wantsLocal
+        ? "Local time"
+        : selectedTimezone
+        ? `${selectedTimezone.label} (${getTimezoneOffset(selectedTimezone.timezone)})`
+        : "Timezone missing";
+      const time = wantsLocal
+        ? clockTime(now)
+        : selectedTimezone
+        ? getTimezoneTime(selectedTimezone.timezone, now)
+        : "--:--:--";
 
       return (
         <MonitorWidget
@@ -1131,36 +1255,10 @@ function App() {
           customLabel={customLabel}
           showLabel={showLabel}
           display={time}
-          defaultFaceColor={state.clockColor}
+          defaultFaceColor={broken ? "#888" : state.clockColor}
           colors={colors}
-          control={
-            isEditing ? (
-              <Dropdown
-                size="small"
-                value={selectedTimezone?.label ?? "Local time"}
-                selectedOptions={[selectedTimezone?.id ?? ""]}
-                onOptionSelect={(_e, data) => {
-                  if (data.optionValue === "__manage__") {
-                    window.api.send("preferences:open", "timezones");
-                    return;
-                  }
-                  handleUpdateWidgetSettings(node.id, {
-                    timezoneId: data.optionValue || undefined,
-                  });
-                }}
-              >
-                <Option value="">Local time</Option>
-                {timezones.map((tz) => (
-                  <Option key={tz.id} value={tz.id} text={tz.label}>
-                    {tz.label}
-                  </Option>
-                ))}
-                <Option value="__manage__" text="Manage timezones…">
-                  Manage timezones…
-                </Option>
-              </Dropdown>
-            ) : undefined
-          }
+          faceTitle={broken ? "Timezone no longer configured" : undefined}
+          control={isEditing ? renderTimezonePicker(node) : undefined}
         />
       );
     }
@@ -1208,20 +1306,7 @@ function App() {
           display={display}
           defaultFaceColor={overdue ? "red" : state.clockColor}
           colors={colors}
-          control={
-            isEditing ? (
-              <Input
-                size="small"
-                value={target}
-                placeholder="HH:MM:SS"
-                onChange={(_e, data) =>
-                  handleUpdateWidgetSettings(node.id, {
-                    targetTime: data.value || undefined,
-                  })
-                }
-              />
-            ) : undefined
-          }
+          control={isEditing ? renderTargetTimeInput(node) : undefined}
         />
       );
     }
@@ -1507,20 +1592,7 @@ function App() {
           display={displayTime}
           defaultFaceColor={state.clockColor}
           colors={colors}
-          control={
-            isEditing ? (
-              <Input
-                size="small"
-                value={timerName}
-                placeholder="default"
-                onChange={(_e, data) =>
-                  handleUpdateWidgetSettings(node.id, {
-                    oscTimerName: data.value || undefined,
-                  })
-                }
-              />
-            ) : undefined
-          }
+          control={isEditing ? renderOscTimerNameInput(node) : undefined}
         />
       );
     }
@@ -1642,9 +1714,11 @@ function App() {
 
     if (node.widgetKey === "recorderStatus") {
       const recorders = state.recorders;
-      const recorder =
-        recorders.find((r) => r.id === node.settings?.recorderId) ||
-        recorders[0];
+      // Fall back to the first deck only when nothing is configured; a set id
+      // that no longer matches must not silently show a different machine.
+      const recorder = node.settings?.recorderId
+        ? recorders.find((r) => r.id === node.settings?.recorderId)
+        : recorders[0];
       const recording = recorder?.status === "record";
       // HyperDeck reports timecode as HH:MM:SS:FF or HH:MM:SS;FF (drop-frame).
       // Strip the frame portion so the widget shows the same HH:MM:SS as our other timers.
@@ -1693,9 +1767,11 @@ function App() {
 
     if (node.widgetKey === "recorderMedia") {
       const recorders = state.recorders;
-      const recorder =
-        recorders.find((r) => r.id === node.settings?.recorderId) ||
-        recorders[0];
+      // Fall back to the first deck only when nothing is configured; a set id
+      // that no longer matches must not silently show a different machine.
+      const recorder = node.settings?.recorderId
+        ? recorders.find((r) => r.id === node.settings?.recorderId)
+        : recorders[0];
       const remaining = recorder?.recordingTimeRemaining;
       const hasMedia =
         !!recorder?.connected &&
@@ -1801,20 +1877,7 @@ function App() {
             overflowWrap: "anywhere",
           }}
           faceTitle={`Send /display/${key} <value> to update; no arguments clears it`}
-          control={
-            isEditing ? (
-              <Input
-                size="small"
-                value={key}
-                placeholder="key"
-                onChange={(_e, data) =>
-                  handleUpdateWidgetSettings(node.id, {
-                    displayKey: data.value || undefined,
-                  })
-                }
-              />
-            ) : undefined
-          }
+          control={isEditing ? renderDisplayKeyInput(node) : undefined}
         />
       );
     }
@@ -1942,6 +2005,17 @@ function App() {
   const renderWidget = (node: WidgetNode) => {
     const widget = widgetCatalog[node.widgetKey];
     const widgetLabel = widget?.label ?? "Widget";
+    const helpReadiness = widget
+      ? getWidgetReadiness(node.widgetKey, widget.source, node.settings, readinessState)
+      : null;
+    // Tint the help icon so "needs attention" stays visible at a glance even
+    // though the explanation now lives behind the modal.
+    const helpTint =
+      helpReadiness && helpReadiness.level !== "ready"
+        ? helpReadiness.level === "offline" || helpReadiness.level === "brokenRef"
+          ? "#dc2626"
+          : "#f59e0b"
+        : undefined;
 
     const titleBlock = (
       <div>
@@ -2002,6 +2076,19 @@ function App() {
             </MenuList>
           </MenuPopover>
         </Menu>
+        <Tooltip content="What is this widget?" relationship="label" withArrow>
+          <Button
+            appearance="subtle"
+            size="small"
+            icon={
+              <QuestionCircleRegular
+                style={helpTint ? { color: helpTint } : undefined}
+              />
+            }
+            aria-label="Widget help"
+            onClick={() => setHelpWidgetId(node.id)}
+          />
+        </Tooltip>
         <Popover
           open={configuringWidgetId === node.id}
           onOpenChange={(_e, data) =>
@@ -2347,6 +2434,40 @@ function App() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {(() => {
+        if (!helpWidgetId) return null;
+        const helpNode = findWidget(draftRoot, helpWidgetId);
+        const def = helpNode ? widgetCatalog[helpNode.widgetKey] : undefined;
+        if (!helpNode || !def) return null;
+        const readiness = getWidgetReadiness(
+          helpNode.widgetKey,
+          def.source,
+          helpNode.settings,
+          readinessState
+        );
+        const telemetry = sourceTelemetry(def.source, readinessState);
+        return (
+          <WidgetHelpDialog
+            open
+            widget={def}
+            readiness={
+              readiness.level === "ready"
+                ? readiness
+                : {
+                    ...readiness,
+                    reason: interpolate(readiness.reason, readinessState),
+                  }
+            }
+            setupSteps={integrationHelp[def.source].setup.map((step) =>
+              interpolate(step, readinessState)
+            )}
+            setupHint={interpolate(def.setupHint, readinessState)}
+            lastData={telemetry ? formatLastData(telemetry, now) : undefined}
+            onClose={() => setHelpWidgetId(null)}
+          />
+        );
+      })()}
 
       <PromptDialog
         open={!!renameTargetId}

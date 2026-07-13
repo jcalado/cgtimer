@@ -394,6 +394,10 @@ const createWindow = (): void => {
       ccgFormat: osc.channelFormat,
       ccgFramerate: osc.channelFramerate,
       displayValues: osc.getDisplayValues(),
+      sources: {
+        ...osc.getSourcesSnapshot(),
+        oscPort: store.get("server").port,
+      },
       elapsedColor: store.get("colors.elapsed"),
       remainingColor: store.get("colors.remaining"),
       clockColor: store.get("colors.clock"),
