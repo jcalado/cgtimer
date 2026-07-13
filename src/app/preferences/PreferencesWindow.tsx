@@ -14,8 +14,12 @@ import {
   AppGenericRegular,
   ClockRegular,
   ColorRegular,
+  GridRegular,
+  MusicNote2Regular,
   RecordRegular,
 } from "@fluentui/react-icons";
+import { CompanionSettings } from "./CompanionSettings";
+import { MixerSettings } from "./MixerSettings";
 import { ServerSettings } from "./ServerSettings";
 import { ApplicationSettings } from "./ApplicationSettings";
 import { ColorSettings } from "./ColorSettings";
@@ -73,7 +77,9 @@ type TabValue =
   | "application"
   | "colors"
   | "timezones"
-  | "recorders";
+  | "recorders"
+  | "mixer"
+  | "companion";
 
 const TAB_VALUES: TabValue[] = [
   "server",
@@ -81,6 +87,8 @@ const TAB_VALUES: TabValue[] = [
   "colors",
   "timezones",
   "recorders",
+  "mixer",
+  "companion",
 ];
 
 const isTabValue = (value: string): value is TabValue =>
@@ -115,7 +123,15 @@ export const PreferencesWindow: React.FC = () => {
       console.log("Loaded settings:", loadedSettings);
       // Ensure settings have all required sections with defaults
       setSettings({
-        server: loadedSettings?.server || { port: 6251, channel: 1 },
+        // Spread over defaults so configs saved before a key existed still
+        // produce a fully-populated object.
+        server: {
+          host: "",
+          amcpPort: 5250,
+          port: 6251,
+          channel: 1,
+          ...loadedSettings?.server,
+        },
         application:
           loadedSettings?.application ||
           { display: 0, displayLabel: "", displayX: 0, displayY: 0, fullscreen: false },
@@ -124,15 +140,24 @@ export const PreferencesWindow: React.FC = () => {
           { clock: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
         timezones: loadedSettings?.timezones || { clocks: [] },
         recorders: loadedSettings?.recorders || { hyperdecks: [] },
+        mixer: { x32Host: "", x32Port: 10023, ...loadedSettings?.mixer },
+        companion: {
+          host: "",
+          port: 12321,
+          variable: "cgtimer_layout",
+          ...loadedSettings?.companion,
+        },
       });
     }).catch((error) => {
       console.error("Error loading settings:", error);
       setSettings({
-        server: { port: 6251, channel: 1 },
+        server: { host: "", amcpPort: 5250, port: 6251, channel: 1 },
         application: { display: 0, displayLabel: "", displayX: 0, displayY: 0, fullscreen: false },
         colors: { clock: "#960000", elapsed: "#00FF00", remaining: "#FF0000" },
         timezones: { clocks: [] },
         recorders: { hyperdecks: [] },
+        mixer: { x32Host: "", x32Port: 10023 },
+        companion: { host: "", port: 12321, variable: "cgtimer_layout" },
       });
     });
   }, []);
@@ -212,14 +237,26 @@ export const PreferencesWindow: React.FC = () => {
               <Tab value="recorders" icon={<RecordRegular />}>
                 Recorders
               </Tab>
+              <Tab value="mixer" icon={<MusicNote2Regular />}>
+                Mixer
+              </Tab>
+              <Tab value="companion" icon={<GridRegular />}>
+                Companion
+              </Tab>
             </TabList>
           </div>
 
           <div className={styles.main}>
             {selectedTab === "server" && (
               <ServerSettings
+                host={settings.server.host}
+                amcpPort={settings.server.amcpPort}
                 port={settings.server.port}
                 channel={settings.server.channel}
+                onHostChange={(value) => updateSetting("server", "host", value)}
+                onAmcpPortChange={(value) =>
+                  updateSetting("server", "amcpPort", value)
+                }
                 onPortChange={(value) => updateSetting("server", "port", value)}
                 onChannelChange={(value) =>
                   updateSetting("server", "channel", value)
@@ -270,6 +307,36 @@ export const PreferencesWindow: React.FC = () => {
                 hyperdecks={settings.recorders.hyperdecks}
                 onChange={(hyperdecks) =>
                   updateSetting("recorders", "hyperdecks", hyperdecks)
+                }
+              />
+            )}
+
+            {selectedTab === "mixer" && (
+              <MixerSettings
+                x32Host={settings.mixer.x32Host}
+                x32Port={settings.mixer.x32Port}
+                onX32HostChange={(value) =>
+                  updateSetting("mixer", "x32Host", value)
+                }
+                onX32PortChange={(value) =>
+                  updateSetting("mixer", "x32Port", value)
+                }
+              />
+            )}
+
+            {selectedTab === "companion" && (
+              <CompanionSettings
+                host={settings.companion.host}
+                port={settings.companion.port}
+                variable={settings.companion.variable}
+                onHostChange={(value) =>
+                  updateSetting("companion", "host", value)
+                }
+                onPortChange={(value) =>
+                  updateSetting("companion", "port", value)
+                }
+                onVariableChange={(value) =>
+                  updateSetting("companion", "variable", value)
                 }
               />
             )}

@@ -406,6 +406,26 @@ function App() {
     ccgBackgroundCued: false,
     ccgFormat: "",
     ccgFramerate: 0,
+    displayValues: {} as Record<string, string>,
+    casparcg: {
+      enabled: false,
+      connected: false,
+      lastError: null as string | null,
+      version: "",
+      latencyMs: null as number | null,
+      oscSubscribed: null as boolean | null,
+    },
+    x32: {
+      enabled: false,
+      connected: false,
+      channels: [] as Array<{
+        index: number;
+        name: string;
+        on: boolean;
+        fader: number;
+        meter: number;
+      }>,
+    },
     elapsedColor: "",
     remainingColor: "",
     clockColor: "",
@@ -610,6 +630,20 @@ function App() {
         ccgBackgroundCued: false,
         ccgFormat: "",
         ccgFramerate: 0,
+        displayValues: {},
+        casparcg: {
+          enabled: false,
+          connected: false,
+          lastError: null,
+          version: "",
+          latencyMs: null,
+          oscSubscribed: null,
+        },
+        x32: {
+          enabled: false,
+          connected: false,
+          channels: [],
+        },
         elapsedColor: "",
         remainingColor: "",
         clockColor: "",
@@ -699,6 +733,14 @@ function App() {
   useEffect(() => {
     if (selectedLayout) setDraftRoot(selectedLayout.root);
   }, [selectedLayout]);
+
+  // Announce the active layout (on startup, switches, and renames) so the
+  // main process can feed Companion button feedbacks.
+  useEffect(() => {
+    if (selectedLayout?.name) {
+      window.api.send("layout:active", selectedLayout.name);
+    }
+  }, [selectedLayout?.name]);
 
   useEffect(() => {
     layoutsRef.current = layouts;
@@ -852,6 +894,12 @@ function App() {
     if (widgetKey === "recorderStatus" || widgetKey === "recorderMedia") {
       const first = state.recorders[0];
       return { recorderId: first?.id };
+    }
+    if (widgetKey === "x32Channel" || widgetKey === "x32Meter") {
+      return { x32Channel: 1 };
+    }
+    if (widgetKey === "displayTile") {
+      return { displayKey: `value${generateId().slice(0, 4)}` };
     }
     return undefined;
   };
@@ -1023,6 +1071,42 @@ function App() {
       </Option>
     </Dropdown>
   );
+
+  const x32ChannelLabel = (channelNumber: number) => {
+    const channel = state.x32.channels[channelNumber - 1];
+    const padded = channelNumber.toString().padStart(2, "0");
+    return channel?.name ? `${padded} ${channel.name}` : `Ch ${padded}`;
+  };
+
+  const renderX32ChannelPicker = (node: WidgetNode) => {
+    const selected = node.settings?.x32Channel ?? 1;
+    return (
+      <Dropdown
+        size="small"
+        value={x32ChannelLabel(selected)}
+        selectedOptions={[String(selected)]}
+        onOptionSelect={(_e, data) => {
+          if (data.optionValue === "__manage__") {
+            window.api.send("preferences:open", "mixer");
+            return;
+          }
+          const parsed = parseInt(data.optionValue || "", 10);
+          if (!isNaN(parsed)) {
+            handleUpdateWidgetSettings(node.id, { x32Channel: parsed });
+          }
+        }}
+      >
+        {Array.from({ length: 32 }, (_, i) => i + 1).map((i) => (
+          <Option key={i} value={String(i)} text={x32ChannelLabel(i)}>
+            {x32ChannelLabel(i)}
+          </Option>
+        ))}
+        <Option value="__manage__" text="Configure mixer…">
+          Configure mixer…
+        </Option>
+      </Dropdown>
+    );
+  };
 
   const renderWidgetBody = (node: WidgetNode, isEditing: boolean) => {
     const widget = widgetCatalog[node.widgetKey];
@@ -1313,6 +1397,70 @@ function App() {
             fontSize: "min(10cqw, 28cqh)",
           }}
           faceTitle={fps ? `${display} (${fps} fps)` : display}
+        />
+      );
+    }
+
+    if (node.widgetKey === "ccgHealth") {
+      const cg = state.casparcg;
+      const offline = cg.enabled && !cg.connected;
+      const display = !cg.enabled
+        ? "—"
+        : offline
+        ? "OFFLINE"
+        : cg.latencyMs != null
+        ? `${cg.latencyMs} ms`
+        : "OK";
+      const healthColor = !cg.enabled ? "#888" : offline ? "#dc2626" : "#22c55e";
+      const healthTitle = !cg.enabled
+        ? "Set the CasparCG server address in Preferences to enable"
+        : offline
+        ? `Disconnected${cg.lastError ? `: ${cg.lastError}` : ""}`
+        : [
+            cg.version ? `CasparCG ${cg.version}` : "Connected",
+            cg.oscSubscribed === false
+              ? "OSC auto-subscribe refused (needs server 2.4+); configure OSC in casparcg.config"
+              : cg.oscSubscribed
+              ? "OSC subscribed"
+              : undefined,
+          ]
+            .filter(Boolean)
+            .join(". ");
+      return (
+        <MonitorWidget
+          label={cg.version ? `CasparCG ${cg.version.split(" ")[0]}` : "CasparCG"}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={display}
+          defaultFaceColor={healthColor}
+          colors={colors}
+          ending={offline}
+          faceStyle={{
+            fontFamily: "inherit",
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            fontSize: "min(11cqw, 30cqh)",
+          }}
+          faceAriaLabel={healthTitle}
+          faceTitle={healthTitle}
+          overlay={
+            cg.connected && cg.oscSubscribed === false ? (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "3cqh",
+                  right: "3cqw",
+                  fontFamily: "system-ui, sans-serif",
+                  color: "#f59e0b",
+                  fontSize: "min(5cqw, 14cqh)",
+                  lineHeight: 1,
+                  pointerEvents: "none",
+                }}
+              >
+                NO OSC PUSH
+              </span>
+            ) : undefined
+          }
         />
       );
     }
@@ -1628,6 +1776,159 @@ function App() {
                 }}
               >
                 {offline} OFFLINE
+              </span>
+            ) : undefined
+          }
+        />
+      );
+    }
+
+    if (node.widgetKey === "displayTile") {
+      const key = node.settings?.displayKey || "value";
+      const value = state.displayValues[key] ?? "";
+      return (
+        <MonitorWidget
+          label={key}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={value || "—"}
+          defaultFaceColor={value ? state.clockColor : "#888"}
+          colors={colors}
+          faceStyle={{
+            fontFamily: "inherit",
+            fontSize: "min(10cqw, 24cqh)",
+            padding: "0 4cqw",
+            overflowWrap: "anywhere",
+          }}
+          faceTitle={`Send /display/${key} <value> to update; no arguments clears it`}
+          control={
+            isEditing ? (
+              <Input
+                size="small"
+                value={key}
+                placeholder="key"
+                onChange={(_e, data) =>
+                  handleUpdateWidgetSettings(node.id, {
+                    displayKey: data.value || undefined,
+                  })
+                }
+              />
+            ) : undefined
+          }
+        />
+      );
+    }
+
+    if (node.widgetKey === "x32Channel") {
+      const chNum = node.settings?.x32Channel ?? 1;
+      const channel = state.x32.channels[chNum - 1];
+      const live = state.x32.enabled && state.x32.connected && !!channel;
+      const display = !state.x32.enabled
+        ? "—"
+        : !live
+        ? "OFFLINE"
+        : channel.on
+        ? "ON"
+        : "MUTED";
+      const chColor = !state.x32.enabled
+        ? "#888"
+        : !live
+        ? "#dc2626"
+        : channel.on
+        ? "#22c55e"
+        : "#dc2626";
+      const chTitle = !state.x32.enabled
+        ? "Set the mixer address in Preferences to enable"
+        : !live
+        ? "No reply from the console"
+        : `${x32ChannelLabel(chNum)}: ${channel.on ? "on" : "muted"}, fader ${Math.round(
+            channel.fader * 100
+          )}%`;
+      return (
+        <MonitorWidget
+          label={x32ChannelLabel(chNum)}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={display}
+          defaultFaceColor={chColor}
+          colors={colors}
+          ending={state.x32.enabled && !live}
+          faceStyle={{
+            fontFamily: "inherit",
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            fontSize: "min(12cqw, 35cqh)",
+          }}
+          faceAriaLabel={chTitle}
+          faceTitle={chTitle}
+          control={isEditing ? renderX32ChannelPicker(node) : undefined}
+        />
+      );
+    }
+
+    if (node.widgetKey === "x32Meter") {
+      const chNum = node.settings?.x32Channel ?? 1;
+      const channel = state.x32.channels[chNum - 1];
+      const live = state.x32.enabled && state.x32.connected && !!channel;
+      // Meter floats are linear [0..1]; show them on a dB scale with a
+      // -60 dB floor so quiet-but-present audio still registers.
+      const meter = live ? channel.meter : 0;
+      const db = meter > 0 ? 20 * Math.log10(meter) : -60;
+      const pct = Math.min(100, Math.max(0, ((db + 60) / 60) * 100));
+      const fill = pct > 90 ? "#dc2626" : pct > 75 ? "#f59e0b" : "#22c55e";
+      const meterTitle = !state.x32.enabled
+        ? "Set the mixer address in Preferences to enable"
+        : !live
+        ? "No reply from the console"
+        : `${x32ChannelLabel(chNum)}: ${db <= -60 ? "-inf" : db.toFixed(1)} dB`;
+      return (
+        <MonitorWidget
+          label={x32ChannelLabel(chNum)}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={
+            <div
+              style={{
+                width: "22cqw",
+                height: "72cqh",
+                backgroundColor: "#333",
+                borderRadius: "6px",
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "flex-end",
+              }}
+            >
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: fill,
+                  transform: `scaleY(${pct / 100})`,
+                  transformOrigin: "bottom",
+                  transition: "transform 0.15s linear",
+                }}
+              />
+            </div>
+          }
+          colors={colors}
+          faceAriaLabel={meterTitle}
+          faceTitle={meterTitle}
+          control={isEditing ? renderX32ChannelPicker(node) : undefined}
+          overlay={
+            live && !channel.on ? (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "3cqh",
+                  right: "3cqw",
+                  fontFamily: "system-ui, sans-serif",
+                  color: "#dc2626",
+                  fontSize: "min(5cqw, 14cqh)",
+                  lineHeight: 1,
+                  pointerEvents: "none",
+                }}
+              >
+                MUTED
               </span>
             ) : undefined
           }

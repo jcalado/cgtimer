@@ -24,6 +24,7 @@ class oscListener {
   channelFramerate: number;
   foregroundSeenAt: number;
   backgroundSeenAt: number;
+  displayValues: Map<string, string>;
   udpPort: UDPPort | undefined;
   onLayoutLoad?: (layoutName: string) => void;
   onTimerCommand?: (name: string, action: TimerAction, value?: number) => void;
@@ -51,6 +52,7 @@ class oscListener {
     this.channelFramerate = 0;
     this.foregroundSeenAt = 0;
     this.backgroundSeenAt = 0;
+    this.displayValues = new Map();
     this.udpPort = undefined;
     this.onLayoutLoad = onLayoutLoad;
     this.onTimerCommand = onTimerCommand;
@@ -82,6 +84,12 @@ class oscListener {
       // Handle timer commands: /timer/{name}/{action}
       if (message["address"].startsWith("/timer/")) {
         this.parseTimerCommand(message);
+        return;
+      }
+
+      // Handle display tiles: /display/{key} <value...>
+      if (message["address"].startsWith("/display/")) {
+        this.parseDisplayMessage(message);
         return;
       }
 
@@ -233,6 +241,37 @@ class oscListener {
     }
   };
 
+  /** Cap so a stray OSC source spamming random keys cannot grow memory forever. */
+  private static readonly MAX_DISPLAY_KEYS = 512;
+
+  private parseDisplayMessage = (message: OSCMessage) => {
+    const key = message["address"].slice("/display/".length);
+    if (!key) return;
+
+    const args = message["args"] || [];
+    // No arguments (or a single empty string) clears the tile.
+    const value = args
+      .map((arg) => String(arg?.value ?? ""))
+      .join(" ")
+      .trim();
+
+    if (!value) {
+      this.displayValues.delete(key);
+      return;
+    }
+    if (
+      !this.displayValues.has(key) &&
+      this.displayValues.size >= oscListener.MAX_DISPLAY_KEYS
+    ) {
+      return;
+    }
+    this.displayValues.set(key, value);
+  };
+
+  public getDisplayValues = (): Record<string, string> => {
+    return Object.fromEntries(this.displayValues);
+  };
+
   private parseTimerCommand = (message: OSCMessage) => {
     if (!this.onTimerCommand) return;
 
@@ -284,6 +323,7 @@ class oscListener {
     this.channelFramerate = 0;
     this.foregroundSeenAt = 0;
     this.backgroundSeenAt = 0;
+    this.displayValues.clear();
   };
 
   /**
