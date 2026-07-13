@@ -1,13 +1,16 @@
 import {
   ArrowRepeatAllRegular,
+  BracesVariableRegular,
   CalendarClockRegular,
   ClockRegular,
   DataBarHorizontalRegular,
   FilmstripRegular,
   FlagRegular,
   GlobeRegular,
+  DataBarVerticalRegular,
   HistoryRegular,
   HourglassRegular,
+  MicRegular,
   NextRegular,
   PauseCircleRegular,
   PlayCircleRegular,
@@ -15,6 +18,7 @@ import {
   PulseRegular,
   RecordRegular,
   RectangleLandscapeRegular,
+  ServerRegular,
   StackRegular,
   StorageRegular,
   TextFontRegular,
@@ -31,6 +35,8 @@ export const WIDGET_GROUPS: { id: WidgetGroup; label: string }[] = [
   { id: "timers", label: "Timers" },
   { id: "ontime", label: "Ontime" },
   { id: "recorders", label: "Recorders" },
+  { id: "audio", label: "Audio" },
+  { id: "utility", label: "Utility" },
 ];
 
 export const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
@@ -114,6 +120,14 @@ export const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     color: "#64748b",
     group: "playback",
   },
+  ccgHealth: {
+    key: "ccgHealth",
+    label: "Server Health",
+    description: "CasparCG AMCP connection, version and round-trip latency",
+    icon: <ServerRegular />,
+    color: "#22c55e",
+    group: "playback",
+  },
   timeOfDayCountdown: {
     key: "timeOfDayCountdown",
     label: "Time-of-day Countdown",
@@ -193,5 +207,30 @@ export const widgetCatalog: Record<WidgetKind, WidgetDefinition> = {
     icon: <StackRegular />,
     color: "#dc2626",
     group: "recorders",
+  },
+  x32Channel: {
+    key: "x32Channel",
+    label: "X32 Channel",
+    description: "Mute state and name of an X32/M32 input channel",
+    icon: <MicRegular />,
+    color: "#f43f5e",
+    group: "audio",
+  },
+  x32Meter: {
+    key: "x32Meter",
+    label: "X32 Meter",
+    description: "Live input level meter for an X32/M32 channel",
+    icon: <DataBarVerticalRegular />,
+    color: "#10b981",
+    group: "audio",
+  },
+  displayTile: {
+    key: "displayTile",
+    label: "Variable Tile",
+    description:
+      "Shows any value pushed to /display/{key} over OSC (e.g. a Bitfocus Companion variable)",
+    icon: <BracesVariableRegular />,
+    color: "#eab308",
+    group: "utility",
   },
 };

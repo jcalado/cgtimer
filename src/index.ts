@@ -6,6 +6,9 @@ import oscListener from "./osc";
 import store from "./store";
 import type { StoreSchema } from "./store";
 import { HyperDeckClient, HyperDeckSnapshot } from "./hyperdeck";
+import { AmcpClient, DISABLED_AMCP_SNAPSHOT } from "./casparcg";
+import { X32Client, DISABLED_X32_SNAPSHOT } from "./x32";
+import { CompanionAnnouncer } from "./companion";
 
 
 // In development, electron-vite sets ELECTRON_RENDERER_URL environment variable
@@ -17,6 +20,95 @@ let mainWindow: BrowserWindow | null = null;
 let timer: NodeJS.Timeout;
 let layoutShortcuts: string[] = [];
 const hyperdeckClients = new Map<string, HyperDeckClient>();
+let amcpClient: AmcpClient | null = null;
+
+const reconcileAmcp = () => {
+  const server = store.get("server");
+  const desired = server.host
+    ? {
+        host: server.host,
+        port: server.amcpPort || 5250,
+        oscPort: server.port,
+      }
+    : null;
+
+  if (
+    amcpClient &&
+    (!desired ||
+      amcpClient.host !== desired.host ||
+      amcpClient.port !== desired.port ||
+      amcpClient.oscPort !== desired.oscPort)
+  ) {
+    amcpClient.stop();
+    amcpClient = null;
+  }
+
+  if (desired && !amcpClient) {
+    amcpClient = new AmcpClient(desired);
+    amcpClient.start();
+  }
+};
+
+let x32Client: X32Client | null = null;
+
+const reconcileX32 = () => {
+  const mixer = store.get("mixer") || { x32Host: "", x32Port: 10023 };
+  const desired = mixer.x32Host
+    ? { host: mixer.x32Host, port: mixer.x32Port || 10023 }
+    : null;
+
+  if (
+    x32Client &&
+    (!desired ||
+      x32Client.host !== desired.host ||
+      x32Client.port !== desired.port)
+  ) {
+    x32Client.stop();
+    x32Client = null;
+  }
+
+  if (desired && !x32Client) {
+    x32Client = new X32Client(desired);
+    x32Client.start();
+  }
+};
+
+let companionAnnouncer: CompanionAnnouncer | null = null;
+// Remembered across reconciles so a freshly-configured target hears the
+// current layout immediately instead of waiting for the next switch.
+let activeLayoutName = "";
+
+const reconcileCompanion = () => {
+  const companion = store.get("companion") || {
+    host: "",
+    port: 12321,
+    variable: "cgtimer_layout",
+  };
+  const desired = companion.host
+    ? {
+        host: companion.host,
+        port: companion.port || 12321,
+        variable: companion.variable || "cgtimer_layout",
+      }
+    : null;
+
+  if (
+    companionAnnouncer &&
+    (!desired ||
+      companionAnnouncer.host !== desired.host ||
+      companionAnnouncer.port !== desired.port ||
+      companionAnnouncer.variable !== desired.variable)
+  ) {
+    companionAnnouncer.stop();
+    companionAnnouncer = null;
+  }
+
+  if (desired && !companionAnnouncer) {
+    companionAnnouncer = new CompanionAnnouncer(desired);
+    companionAnnouncer.setActiveLayout(activeLayoutName);
+    companionAnnouncer.start();
+  }
+};
 
 const reconcileHyperDecks = () => {
   const desired = (store.get("recorders").hyperdecks || []).filter(
@@ -277,6 +369,9 @@ const createWindow = (): void => {
   Menu.setApplicationMenu(buildMenu());
 
   reconcileHyperDecks();
+  reconcileAmcp();
+  reconcileX32();
+  reconcileCompanion();
 
   timer = setInterval(() => {
     mainWindow?.webContents.send("timers:update", {
@@ -298,11 +393,14 @@ const createWindow = (): void => {
       ccgBackgroundCued: osc.isBackgroundCued(),
       ccgFormat: osc.channelFormat,
       ccgFramerate: osc.channelFramerate,
+      displayValues: osc.getDisplayValues(),
       elapsedColor: store.get("colors.elapsed"),
       remainingColor: store.get("colors.remaining"),
       clockColor: store.get("colors.clock"),
       timezoneClocks: store.get("timezones.clocks") || [],
       recorders: collectHyperDeckSnapshots(),
+      casparcg: amcpClient ? amcpClient.snapshot() : DISABLED_AMCP_SNAPSHOT,
+      x32: x32Client ? x32Client.snapshot() : DISABLED_X32_SNAPSHOT,
     });
   }, 200);
 };
@@ -315,6 +413,8 @@ ipcMain.handle("settings:get", (): StoreSchema => {
     colors: store.get("colors"),
     timezones: store.get("timezones"),
     recorders: store.get("recorders"),
+    mixer: store.get("mixer"),
+    companion: store.get("companion"),
   };
 });
 
@@ -324,8 +424,13 @@ ipcMain.handle("settings:save", (_, settings: StoreSchema) => {
   store.set("colors", settings.colors);
   store.set("timezones", settings.timezones);
   store.set("recorders", settings.recorders);
+  store.set("mixer", settings.mixer);
+  store.set("companion", settings.companion);
 
   reconcileHyperDecks();
+  reconcileAmcp();
+  reconcileX32();
+  reconcileCompanion();
 
   // Refresh the display signature so a freshly-picked monitor can be
   // re-matched after a disconnect even if its id changes.
@@ -351,6 +456,8 @@ ipcMain.handle("settings:reset", (): StoreSchema => {
     colors: store.get("colors"),
     timezones: store.get("timezones"),
     recorders: store.get("recorders"),
+    mixer: store.get("mixer"),
+    companion: store.get("companion"),
   };
 });
 
@@ -364,6 +471,11 @@ ipcMain.on("preferences:open", (_event, tab?: string) => {
 
 ipcMain.on("menubar:set-visible", (_event, visible: boolean) => {
   mainWindow?.setMenuBarVisibility(!!visible);
+});
+
+ipcMain.on("layout:active", (_event, name: string) => {
+  activeLayoutName = String(name || "");
+  companionAnnouncer?.setActiveLayout(activeLayoutName);
 });
 
 ipcMain.on("layouts:update", (_event, layoutNames: string[]) => {

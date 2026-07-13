@@ -57,6 +57,7 @@ wiki — [code@jcalado.com](mailto:code@jcalado.com).
 | Playback    | Next Clip               | Clip cued via `LOADBG`; flashes `NOT CUED` as the playing clip ends  |
 | Playback    | Clip Progress           | Progress bar for the playing clip                                    |
 | Playback    | Channel Format          | Video mode and framerate of the CasparCG channel                     |
+| Playback    | Server Health           | CasparCG AMCP connection, version and round-trip latency             |
 | Timers      | Time-of-day Countdown   | Counts down to a target `HH:MM:SS`                                   |
 | Timers      | OSC Timer               | Named stopwatch driven by `/timer/{name}/...` OSC commands           |
 | Ontime      | Ontime Timer            | Mirrors `timer.current`                                              |
@@ -67,6 +68,9 @@ wiki — [code@jcalado.com](mailto:code@jcalado.com).
 | Recorders   | HyperDeck Recorder      | Live status + record timecode for a Blackmagic HyperDeck             |
 | Recorders   | HyperDeck Media         | Remaining record capacity on a HyperDeck's active slot               |
 | Recorders   | All Recorders           | `n/m REC` rollup across every HyperDeck, with offline warning        |
+| Audio       | X32 Channel             | Mute state and name of an X32/M32 input channel                      |
+| Audio       | X32 Meter               | Live input level meter (dB scale) for an X32/M32 channel             |
+| Utility     | Variable Tile           | Shows any value pushed to `/display/{key}` over OSC                  |
 
 ## Configuration
 
@@ -76,6 +80,49 @@ Press `Alt` to reveal the menu, or `Cmd`/`Ctrl + ,` to jump straight to
 **Preferences**. From there you can configure the OSC port and CasparCG
 channel, pick the display, set default colors, and manage your timezones
 and HyperDecks.
+
+### CasparCG connection (AMCP)
+
+Setting a **Server address** in Preferences opens an AMCP connection
+(TCP/5250 by default) that powers the Server Health widget: reachability,
+server version, and round-trip latency via `PING`. On CasparCG 2.4+ the
+connection also issues `OSC SUBSCRIBE`, so the server streams OSC to
+CGTimer with no `casparcg.config` changes. Older servers refuse the
+command; the health widget then shows a `NO OSC PUSH` badge and you
+configure the OSC target in `casparcg.config` as before. Leaving the
+address empty disables the AMCP client entirely; OSC listening works
+as always.
+
+### Variable tiles
+
+Any OSC sender can drive a **Variable Tile** by sending
+`/display/{key} <value>` to CGTimer's OSC port; sending the address with
+no arguments clears the tile. In Bitfocus Companion, add a generic OSC
+instance pointed at CGTimer and a trigger like "on variable change, send
+`/display/cam1 $(atem:input_1_name)`", and the tile becomes a live
+readout for that variable. Arguments are joined with spaces, so multiple
+values in one message work too.
+
+### Companion feedback
+
+Layouts are switchable from a Stream Deck by sending `/layout/load "Show A"`
+from a Companion Generic OSC instance. To make the buttons light up with the
+active layout, set the Companion address in **Preferences → Companion**:
+CGTimer then pushes the active layout name to Companion's inbound OSC API
+(`/custom-variable/cgtimer_layout/value`, port 12321 by default) on every
+switch, on startup, and every 10 s as a keepalive. Create the custom
+variable in Companion under **Variables → Custom**, then give each layout
+button a **Check variable value** feedback comparing it to that button's
+layout name. CGTimer also emits a generic `/layout/active "Show A"` to the
+same target for non-Companion consumers.
+
+### X32 / M32 mixer
+
+Set the console address in **Preferences → Mixer** (OSC port 10023 by
+default) to enable the X32 widgets. CGTimer subscribes with `/xremote`
+and `/meters` and renews automatically; channel names, mute states and
+fader levels come straight from the desk, so relabeling a channel on the
+console updates the dashboard.
 
 ### Layout editor
 

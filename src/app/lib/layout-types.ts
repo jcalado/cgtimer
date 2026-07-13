@@ -12,6 +12,7 @@ export type WidgetKind =
   | "ccgNextClip"
   | "ccgProgress"
   | "ccgFormat"
+  | "ccgHealth"
   | "oscTimer"
   | "ontimeTimer"
   | "ontimeTitle"
@@ -20,7 +21,10 @@ export type WidgetKind =
   | "ontimeExpectedFinish"
   | "recorderStatus"
   | "recorderMedia"
-  | "recorderAggregate";
+  | "recorderAggregate"
+  | "x32Channel"
+  | "x32Meter"
+  | "displayTile";
 
 export type WidgetSettings = {
   timezoneId?: string;
@@ -32,9 +36,18 @@ export type WidgetSettings = {
   oscTimerName?: string;
   targetTime?: string; // HH:MM:SS for timeOfDayCountdown
   recorderId?: string; // hyperdeck id for recorderStatus / recorderMedia
+  x32Channel?: number; // 1-based console channel for x32Channel / x32Meter
+  displayKey?: string; // key watched by displayTile (/display/{key})
 };
 
-export type WidgetGroup = "clocks" | "playback" | "timers" | "ontime" | "recorders";
+export type WidgetGroup =
+  | "clocks"
+  | "playback"
+  | "timers"
+  | "ontime"
+  | "recorders"
+  | "audio"
+  | "utility";
 
 export type WidgetDefinition = {
   key: WidgetKind;

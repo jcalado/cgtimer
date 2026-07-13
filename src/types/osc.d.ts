@@ -1,5 +1,5 @@
 declare module "osc" {
-  export type OSCValue = string | number | boolean | null;
+  export type OSCValue = string | number | boolean | null | Uint8Array;
 
   export interface OSCMessage {
     address: string;
@@ -9,6 +9,8 @@ declare module "osc" {
   export interface UDPPortOptions {
     localAddress: string;
     localPort: number;
+    remoteAddress?: string;
+    remotePort?: number;
     metadata?: boolean;
   }
 
@@ -18,6 +20,10 @@ declare module "osc" {
       event: "message",
       listener: (oscMessage: OSCMessage, timetag?: unknown, info?: unknown) => void
     ): void;
+    on(event: "ready", listener: () => void): void;
+    on(event: "error", listener: (error: Error) => void): void;
+    /** Sends to the configured remoteAddress/remotePort. */
+    send(message: OSCMessage): void;
     open(): void;
     close(): void;
   }

@@ -6,6 +6,9 @@ import { HyperDeck, TimezoneClock } from "./shared/entities";
 
 export interface StoreSchema {
   server: {
+    /** CasparCG address for AMCP; empty string disables the client. */
+    host: string;
+    amcpPort: number;
     port: number;
     channel: number;
   };
@@ -27,12 +30,34 @@ export interface StoreSchema {
   recorders: {
     hyperdecks: HyperDeck[];
   };
+  mixer: {
+    /** X32/M32 console address; empty string disables the client. */
+    x32Host: string;
+    x32Port: number;
+  };
+  companion: {
+    /** Bitfocus Companion address; empty string disables announcements. */
+    host: string;
+    port: number;
+    /** Companion custom variable set to the active layout name. */
+    variable: string;
+  };
 }
 
 const schema: Schema<StoreSchema> = {
   server: {
     type: "object",
     properties: {
+      host: {
+        type: "string",
+        default: "",
+      },
+      amcpPort: {
+        type: "number",
+        default: 5250,
+        minimum: 1,
+        maximum: 65535,
+      },
       port: {
         type: "number",
         default: 6251,
@@ -130,11 +155,47 @@ const schema: Schema<StoreSchema> = {
       },
     },
   },
+  mixer: {
+    type: "object",
+    properties: {
+      x32Host: {
+        type: "string",
+        default: "",
+      },
+      x32Port: {
+        type: "number",
+        default: 10023,
+        minimum: 1,
+        maximum: 65535,
+      },
+    },
+  },
+  companion: {
+    type: "object",
+    properties: {
+      host: {
+        type: "string",
+        default: "",
+      },
+      port: {
+        type: "number",
+        default: 12321,
+        minimum: 1,
+        maximum: 65535,
+      },
+      variable: {
+        type: "string",
+        default: "cgtimer_layout",
+      },
+    },
+  },
 };
 
 // Default values for the store
 const defaults: StoreSchema = {
   server: {
+    host: "",
+    amcpPort: 5250,
     port: 6251,
     channel: 1,
   },
@@ -155,6 +216,15 @@ const defaults: StoreSchema = {
   },
   recorders: {
     hyperdecks: [],
+  },
+  mixer: {
+    x32Host: "",
+    x32Port: 10023,
+  },
+  companion: {
+    host: "",
+    port: 12321,
+    variable: "cgtimer_layout",
   },
 };
 
