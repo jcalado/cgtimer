@@ -3,6 +3,21 @@ import store from "./store";
 
 type TimerAction = "start" | "stop" | "reset" | "toggle" | "set";
 
+export type SourceTelemetry = {
+  /** Epoch ms of the last packet in this address family; 0 = never. */
+  lastSeenAt: number;
+  lastSender: string;
+};
+
+export type OscSourcesSnapshot = {
+  ccgOsc: SourceTelemetry;
+  ontime: SourceTelemetry;
+  oscTimer: SourceTelemetry;
+  display: SourceTelemetry;
+};
+
+const emptyTelemetry = (): SourceTelemetry => ({ lastSeenAt: 0, lastSender: "" });
+
 class oscListener {
   port: number;
   currentTime: number;
@@ -25,6 +40,7 @@ class oscListener {
   foregroundSeenAt: number;
   backgroundSeenAt: number;
   displayValues: Map<string, string>;
+  sources: OscSourcesSnapshot;
   udpPort: UDPPort | undefined;
   onLayoutLoad?: (layoutName: string) => void;
   onTimerCommand?: (name: string, action: TimerAction, value?: number) => void;
@@ -53,6 +69,12 @@ class oscListener {
     this.foregroundSeenAt = 0;
     this.backgroundSeenAt = 0;
     this.displayValues = new Map();
+    this.sources = {
+      ccgOsc: emptyTelemetry(),
+      ontime: emptyTelemetry(),
+      oscTimer: emptyTelemetry(),
+      display: emptyTelemetry(),
+    };
     this.udpPort = undefined;
     this.onLayoutLoad = onLayoutLoad;
     this.onTimerCommand = onTimerCommand;
@@ -72,7 +94,7 @@ class oscListener {
 
     
 
-    this.udpPort.on("message", (message: OSCMessage) => {
+    this.udpPort.on("message", (message: OSCMessage, _timetag?: unknown, info?: unknown) => {
       if (message["address"] === "/layout/load" || message["address"] === "/layout/select") {
         const [firstArg] = message["args"] || [];
         if (typeof firstArg?.value === "string" && this.onLayoutLoad) {
@@ -83,22 +105,28 @@ class oscListener {
 
       // Handle timer commands: /timer/{name}/{action}
       if (message["address"].startsWith("/timer/")) {
+        this.stamp("oscTimer", info);
         this.parseTimerCommand(message);
         return;
       }
 
       // Handle display tiles: /display/{key} <value...>
       if (message["address"].startsWith("/display/")) {
+        this.stamp("display", info);
         this.parseDisplayMessage(message);
         return;
       }
 
-      // If the message startes with /channel/ then it is a CCG message
+      // If the message startes with /channel/ then it is a CCG message.
+      // Liveness is stamped for ANY channel so a wrong-channel setting still
+      // reads as "feed alive" rather than "server down".
       if (message["address"].startsWith("/channel/")) {
+        this.stamp("ccgOsc", info);
         this.parseCCGMessage(message);
       }
 
       if (message["address"].startsWith("/from-ontime/")) {
+        this.stamp("ontime", info);
         this.parseOntimeMessage(message);
       }
 
@@ -272,6 +300,22 @@ class oscListener {
     return Object.fromEntries(this.displayValues);
   };
 
+  private stamp = (family: keyof OscSourcesSnapshot, info: unknown) => {
+    const telemetry = this.sources[family];
+    telemetry.lastSeenAt = Date.now();
+    const sender = (info as { address?: string } | undefined)?.address;
+    if (sender) telemetry.lastSender = sender;
+  };
+
+  public getSourcesSnapshot = (): OscSourcesSnapshot => {
+    return {
+      ccgOsc: { ...this.sources.ccgOsc },
+      ontime: { ...this.sources.ontime },
+      oscTimer: { ...this.sources.oscTimer },
+      display: { ...this.sources.display },
+    };
+  };
+
   private parseTimerCommand = (message: OSCMessage) => {
     if (!this.onTimerCommand) return;
 
@@ -324,6 +368,14 @@ class oscListener {
     this.foregroundSeenAt = 0;
     this.backgroundSeenAt = 0;
     this.displayValues.clear();
+    // The listener restarts on any Server change (possibly a new port), so
+    // stale liveness stamps from the old socket would mislead the readiness UI.
+    this.sources = {
+      ccgOsc: emptyTelemetry(),
+      ontime: emptyTelemetry(),
+      oscTimer: emptyTelemetry(),
+      display: emptyTelemetry(),
+    };
   };
 
   /**
