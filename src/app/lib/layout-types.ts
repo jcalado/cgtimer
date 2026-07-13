@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 export type WidgetKind =
   | "worldClock"
   | "localClock"
@@ -5,13 +7,20 @@ export type WidgetKind =
   | "secondaryTimer"
   | "timeOfDayCountdown"
   | "loopState"
+  | "ccgClipName"
+  | "ccgPaused"
+  | "ccgNextClip"
+  | "ccgProgress"
+  | "ccgFormat"
   | "oscTimer"
   | "ontimeTimer"
   | "ontimeTitle"
   | "ontimePlayback"
   | "ontimeOnAir"
   | "ontimeExpectedFinish"
-  | "recorderStatus";
+  | "recorderStatus"
+  | "recorderMedia"
+  | "recorderAggregate";
 
 export type WidgetSettings = {
   timezoneId?: string;
@@ -22,7 +31,7 @@ export type WidgetSettings = {
   customLabel?: string;
   oscTimerName?: string;
   targetTime?: string; // HH:MM:SS for timeOfDayCountdown
-  recorderId?: string; // hyperdeck id for recorderStatus
+  recorderId?: string; // hyperdeck id for recorderStatus / recorderMedia
 };
 
 export type WidgetGroup = "clocks" | "playback" | "timers" | "ontime" | "recorders";
@@ -31,7 +40,7 @@ export type WidgetDefinition = {
   key: WidgetKind;
   label: string;
   description: string;
-  icon: React.ReactElement;
+  icon: ReactElement;
   color: string;
   group: WidgetGroup;
 };

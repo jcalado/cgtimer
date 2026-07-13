@@ -12,7 +12,6 @@ import { HyperDeckClient, HyperDeckSnapshot } from "./hyperdeck";
 // In production, we load from the out/renderer directory
 
 const isMac = process.platform === "darwin";
-const isDebug = process.env.NODE_ENV === "development";
 const appSettings = new settings();
 let mainWindow: BrowserWindow | null = null;
 let timer: NodeJS.Timeout;
@@ -61,7 +60,9 @@ const getDisplayOrigin = (display: Display) => {
     return { x: display.bounds.x, y: display.bounds.y };
   }
 
-  const nativeOrigin = (display as any).nativeOrigin;
+  const nativeOrigin = (
+    display as Display & { nativeOrigin?: { x: number; y: number } }
+  ).nativeOrigin;
   return {
     x: nativeOrigin?.x || 0,
     y: nativeOrigin?.y || 0,
@@ -289,6 +290,14 @@ const createWindow = (): void => {
       ontimeExpectedFinish: osc.ontimeExpectedFinish,
       loop: osc.loop,
       stopped: osc.stopped,
+      ccgPaused: osc.paused,
+      ccgActive: osc.isForegroundActive(),
+      ccgClipName: osc.clipName,
+      ccgBackgroundName: osc.backgroundClipName,
+      ccgBackgroundProducer: osc.backgroundProducer,
+      ccgBackgroundCued: osc.isBackgroundCued(),
+      ccgFormat: osc.channelFormat,
+      ccgFramerate: osc.channelFramerate,
       elapsedColor: store.get("colors.elapsed"),
       remainingColor: store.get("colors.remaining"),
       clockColor: store.get("colors.clock"),

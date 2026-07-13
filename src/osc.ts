@@ -15,6 +15,15 @@ class oscListener {
   ontimeExpectedFinish: number;
   loop: boolean;
   stopped: boolean;
+  paused: boolean;
+  clipName: string;
+  foregroundProducer: string;
+  backgroundProducer: string;
+  backgroundClipName: string;
+  channelFormat: string;
+  channelFramerate: number;
+  foregroundSeenAt: number;
+  backgroundSeenAt: number;
   udpPort: UDPPort | undefined;
   onLayoutLoad?: (layoutName: string) => void;
   onTimerCommand?: (name: string, action: TimerAction, value?: number) => void;
@@ -33,6 +42,15 @@ class oscListener {
     this.ontimeExpectedFinish = 0;
     this.loop = false;
     this.stopped = false;
+    this.paused = false;
+    this.clipName = "";
+    this.foregroundProducer = "";
+    this.backgroundProducer = "";
+    this.backgroundClipName = "";
+    this.channelFormat = "";
+    this.channelFramerate = 0;
+    this.foregroundSeenAt = 0;
+    this.backgroundSeenAt = 0;
     this.udpPort = undefined;
     this.onLayoutLoad = onLayoutLoad;
     this.onTimerCommand = onTimerCommand;
@@ -84,32 +102,107 @@ class oscListener {
   private parseCCGMessage = (message: OSCMessage) => {
     const channel = store.get("server").channel;
     const address = message["address"];
-      const args = message["args"];
-      const isFromActiveChannel = new RegExp(`/channel/${channel}`).test(
-        address
-      );
-      const isTimeMessage = new RegExp(`/foreground/file/time`).test(address);
-      const isLoopMessage = new RegExp(`/foreground/loop`).test(address);
+    const args = message["args"];
+    // Anchored so channel 1 does not also match /channel/10, /channel/11, …
+    const isFromActiveChannel = new RegExp(`^/channel/${channel}/`).test(
+      address
+    );
 
-      if (!isFromActiveChannel) {
-        return;
-      }
+    if (!isFromActiveChannel) {
+      return;
+    }
 
-      // Packet contains playing file time
-      if (isTimeMessage) {
-        this.stopped = false;
-        this.currentTime = Math.round(Number(args[0]["value"]));
-        this.totalTime = Math.round(Number(args[1]["value"]));
-        this.remainingTime = this.totalTime - this.currentTime;
-        if (this.remainingTime < 0) {
-          this.remainingTime = 0;
-        }
+    // Packet contains playing file time
+    if (address.endsWith("/foreground/file/time")) {
+      this.stopped = false;
+      this.foregroundSeenAt = Date.now();
+      this.currentTime = Math.round(Number(args[0]["value"]));
+      this.totalTime = Math.round(Number(args[1]["value"]));
+      this.remainingTime = this.totalTime - this.currentTime;
+      if (this.remainingTime < 0) {
+        this.remainingTime = 0;
       }
+      return;
+    }
 
-      if (isLoopMessage) {
-        this.loop = Boolean(args[0]["value"]);
+    if (address.endsWith("/foreground/loop")) {
+      this.foregroundSeenAt = Date.now();
+      this.loop = Boolean(args[0]["value"]);
+      return;
+    }
+
+    if (address.endsWith("/foreground/paused")) {
+      this.foregroundSeenAt = Date.now();
+      this.paused = Boolean(args[0]["value"]);
+      return;
+    }
+
+    if (address.endsWith("/foreground/file/name")) {
+      this.foregroundSeenAt = Date.now();
+      this.clipName = String(args[0]?.["value"] ?? "");
+      return;
+    }
+
+    if (address.endsWith("/foreground/producer")) {
+      this.foregroundSeenAt = Date.now();
+      this.foregroundProducer = String(args[0]?.["value"] ?? "");
+      if (this.foregroundProducer === "empty") {
+        this.clipName = "";
+        this.paused = false;
       }
+      return;
+    }
+
+    if (address.endsWith("/background/producer")) {
+      this.backgroundSeenAt = Date.now();
+      this.backgroundProducer = String(args[0]?.["value"] ?? "");
+      if (this.backgroundProducer === "empty") {
+        this.backgroundClipName = "";
+      }
+      return;
+    }
+
+    if (address.endsWith("/background/file/name")) {
+      this.backgroundSeenAt = Date.now();
+      this.backgroundClipName = String(args[0]?.["value"] ?? "");
+      return;
+    }
+
+    // Channel-level paths (no layer segment): /channel/{n}/format, /channel/{n}/framerate
+    if (address === `/channel/${channel}/format`) {
+      this.channelFormat = String(args[0]?.["value"] ?? "");
+      return;
+    }
+
+    if (address === `/channel/${channel}/framerate`) {
+      // Sent as a rational (numerator, denominator) on 2.3+; tolerate a single value too.
+      const num = Number(args[0]?.["value"] ?? 0);
+      const den = Number(args[1]?.["value"] ?? 1);
+      this.channelFramerate = den > 0 ? num / den : num;
+      return;
+    }
   }
+
+  /**
+   * CasparCG emits per-frame state while a producer is loaded and simply goes
+   * quiet when the layer is cleared, so "no packets recently" means "no clip".
+   */
+  private static readonly CCG_STALE_MS = 1500;
+
+  public isForegroundActive = (): boolean => {
+    return (
+      Date.now() - this.foregroundSeenAt < oscListener.CCG_STALE_MS &&
+      this.foregroundProducer !== "empty"
+    );
+  };
+
+  public isBackgroundCued = (): boolean => {
+    return (
+      Date.now() - this.backgroundSeenAt < oscListener.CCG_STALE_MS &&
+      this.backgroundProducer !== "" &&
+      this.backgroundProducer !== "empty"
+    );
+  };
 
   private parseOntimeMessage = (message: OSCMessage) => {
     const args = message["args"];
@@ -182,6 +275,15 @@ class oscListener {
     this.loop = false;
     this.stopped = true;
     this.totalTime = 0;
+    this.paused = false;
+    this.clipName = "";
+    this.foregroundProducer = "";
+    this.backgroundProducer = "";
+    this.backgroundClipName = "";
+    this.channelFormat = "";
+    this.channelFramerate = 0;
+    this.foregroundSeenAt = 0;
+    this.backgroundSeenAt = 0;
   };
 
   /**

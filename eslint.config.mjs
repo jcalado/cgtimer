@@ -30,6 +30,10 @@ export default [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      // TypeScript itself reports undefined identifiers (including type-only
+      // globals like NodeJS), so the core rule only produces false positives
+      // on TS sources per typescript-eslint guidance.
+      "no-undef": "off",
     },
   },
 ];

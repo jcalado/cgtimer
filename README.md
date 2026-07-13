@@ -52,6 +52,11 @@ wiki — [code@jcalado.com](mailto:code@jcalado.com).
 | Playback    | Remaining Timer         | CasparCG remaining time (red under 10 s, blinks at end)              |
 | Playback    | Elapsed Timer           | CasparCG elapsed time                                                |
 | Playback    | Loop State              | Spinning loop icon while looping is active                           |
+| Playback    | Now Playing             | Filename of the clip playing on the CasparCG layer                   |
+| Playback    | Pause State             | Playing / paused / no-clip indicator for the CasparCG layer          |
+| Playback    | Next Clip               | Clip cued via `LOADBG`; flashes `NOT CUED` as the playing clip ends  |
+| Playback    | Clip Progress           | Progress bar for the playing clip                                    |
+| Playback    | Channel Format          | Video mode and framerate of the CasparCG channel                     |
 | Timers      | Time-of-day Countdown   | Counts down to a target `HH:MM:SS`                                   |
 | Timers      | OSC Timer               | Named stopwatch driven by `/timer/{name}/...` OSC commands           |
 | Ontime      | Ontime Timer            | Mirrors `timer.current`                                              |
@@ -60,6 +65,8 @@ wiki — [code@jcalado.com](mailto:code@jcalado.com).
 | Ontime      | Ontime On-Air           | `● LIVE` / `OFF` indicator, blinks while on-air                      |
 | Ontime      | Ontime Expected Finish  | Wall-clock time the current event is expected to end                 |
 | Recorders   | HyperDeck Recorder      | Live status + record timecode for a Blackmagic HyperDeck             |
+| Recorders   | HyperDeck Media         | Remaining record capacity on a HyperDeck's active slot               |
+| Recorders   | All Recorders           | `n/m REC` rollup across every HyperDeck, with offline warning        |
 
 ## Configuration
 

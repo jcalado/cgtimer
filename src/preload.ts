@@ -1,21 +1,29 @@
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
-import { contextBridge, ipcRenderer, screen } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 import type { StoreSchema } from "./store";
 import type { DisplayInfo } from "./shared/entities";
 
+type IpcHandler = (...args: unknown[]) => void;
+
 export const api = {
-    send: (channel: any, data?: any) => {
+    send: (channel: string, data?: unknown) => {
         ipcRenderer.send(channel, data);
     },
-    receive: (channel: any, handler: any) => {
-        ipcRenderer.on(channel, (...args) => handler(...args));
+    /**
+     * Subscribe to an IPC channel and get back an unsubscribe function.
+     * Function identity is not guaranteed to survive the context bridge, so
+     * a later removeListener(handler) call cannot reliably match the wrapper
+     * registered here; the returned closure is the only safe way to detach.
+     */
+    receive: (channel: string, handler: IpcHandler): (() => void) => {
+        const wrapper = (...args: unknown[]) => handler(...args);
+        ipcRenderer.on(channel, wrapper);
+        return () => {
+            ipcRenderer.removeListener(channel, wrapper);
+        };
     },
-    removeListener: (channel: any, handler: any) => {
-        ipcRenderer.removeListener(channel, (...args) => handler(...args));
-
-    }
 };
 
 export const electronAPI = {

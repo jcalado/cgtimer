@@ -8,6 +8,15 @@ export function toTime(seconds: number): string {
   return new Date(seconds * 1000).toISOString().substr(11, 8);
 }
 
+/** Format a number of seconds as `HH:MM:SS` without wrapping past 24 hours. */
+export function toDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const hh = String(Math.floor(total / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+  const ss = String(total % 60).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
 /** Format a wall-clock epoch ms as the local `HH:MM:SS`. */
 export function clockTime(now: number): string {
   const date = new Date(now);
