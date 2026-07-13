@@ -167,7 +167,7 @@ const store = (() => {
       defaults: defaults,
       clearInvalidConfig: true,
     });
-  } catch (error) {
+  } catch {
     // If there's a schema validation error, it means we're migrating from old format
     // Delete the old config and create a new one with defaults
     const configPath = path.join(app.getPath("userData"), "preferences.json");

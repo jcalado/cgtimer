@@ -35,10 +35,15 @@ export type HyperDeckSnapshot = Omit<HyperDeck, "enabled"> & {
   displayTimecode: string; // HH:MM:SS:FF as reported by the deck
   videoFormat: string;
   clipId: string;
+  slotStatus: string; // empty | mounting | mounted | error (active slot)
+  volumeName: string;
+  recordingTimeRemaining: number | null; // seconds of record capacity left on the active slot
 };
 
 const RECONNECT_DELAY_MS = 5000;
 const POLL_INTERVAL_MS = 500;
+// `slot info` (media remaining) changes slowly; poll it on every Nth transport poll.
+const SLOT_POLL_EVERY = 4;
 
 const parseStatus = (raw: string | undefined): HyperDeckStatus => {
   switch ((raw || "").toLowerCase()) {
@@ -73,8 +78,12 @@ export class HyperDeckClient extends EventEmitter {
   displayTimecode = "";
   videoFormat = "";
   clipId = "";
+  slotStatus = "";
+  volumeName = "";
+  recordingTimeRemaining: number | null = null;
   connected = false;
   lastError: string | null = null;
+  private pollCount = 0;
 
   constructor(opts: { id: string; label: string; host: string; port: number }) {
     super();
@@ -103,13 +112,21 @@ export class HyperDeckClient extends EventEmitter {
       this.lastError = null;
       this.emit("change");
       console.log(`[hyperdeck:${this.label}] connected`);
-      // Subscribe to async transport notifications and ask for the current state.
+      // Subscribe to async transport/slot notifications and ask for the current state.
       socket.write("notify: transport: true\r\n");
+      socket.write("notify: slot: true\r\n");
       socket.write("transport info\r\n");
+      socket.write("slot info\r\n");
       // Some firmwares don't push transport changes reliably; poll as a fallback.
+      // Slot info (remaining capacity) is also polled since it counts down while
+      // recording without emitting async events.
+      this.pollCount = 0;
       this.pollTimer = setInterval(() => {
         if (this.socket && this.connected) {
           this.socket.write("transport info\r\n");
+          if (++this.pollCount % SLOT_POLL_EVERY === 0) {
+            this.socket.write("slot info\r\n");
+          }
         }
       }, POLL_INTERVAL_MS);
     });
@@ -136,6 +153,9 @@ export class HyperDeckClient extends EventEmitter {
       this.displayTimecode = "";
       this.videoFormat = "";
       this.clipId = "";
+      this.slotStatus = "";
+      this.volumeName = "";
+      this.recordingTimeRemaining = null;
       this.socket = null;
       if (wasConnected) {
         console.log(`[hyperdeck:${this.label}] disconnected`);
@@ -180,6 +200,9 @@ export class HyperDeckClient extends EventEmitter {
       displayTimecode: this.displayTimecode,
       videoFormat: this.videoFormat,
       clipId: this.clipId,
+      slotStatus: this.slotStatus,
+      volumeName: this.volumeName,
+      recordingTimeRemaining: this.recordingTimeRemaining,
     };
   }
 
@@ -223,7 +246,6 @@ export class HyperDeckClient extends EventEmitter {
     const head = lines[0];
     const codeMatch = /^(\d{3})\s+(.+?):?$/.exec(head);
     if (!codeMatch) return;
-    const code = parseInt(codeMatch[1], 10);
     const headerText = codeMatch[2].trim().toLowerCase();
     const fields: Record<string, string> = {};
     for (let i = 1; i < lines.length; i++) {
@@ -234,9 +256,12 @@ export class HyperDeckClient extends EventEmitter {
     }
 
     // Sync reply to `transport info` returns code 208; async push uses 508.
-    // Match on the header text so we handle both consistently.
+    // Match on the header text so we handle both consistently. Same story for
+    // `slot info` (202 sync / 502 async).
     if (headerText === "transport info") {
       this.applyTransportInfo(fields);
+    } else if (headerText === "slot info") {
+      this.applySlotInfo(fields);
     }
   }
 
@@ -252,6 +277,20 @@ export class HyperDeckClient extends EventEmitter {
       this.recordingSince = Date.now();
     } else if (this.status !== "record" && previous === "record") {
       this.recordingSince = null;
+    }
+
+    this.emit("change");
+  }
+
+  private applySlotInfo(fields: Record<string, string>) {
+    // Bare `slot info` returns the active slot; async 502 pushes may carry a
+    // partial field set, so only overwrite what is present.
+    if ("status" in fields) this.slotStatus = fields["status"].toLowerCase();
+    if ("volume name" in fields) this.volumeName = fields["volume name"];
+    if ("recording time" in fields) {
+      // Remaining record capacity in whole seconds.
+      const seconds = parseInt(fields["recording time"], 10);
+      this.recordingTimeRemaining = Number.isFinite(seconds) ? seconds : null;
     }
 
     this.emit("change");

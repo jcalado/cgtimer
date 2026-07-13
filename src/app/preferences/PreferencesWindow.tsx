@@ -100,10 +100,11 @@ export const PreferencesWindow: React.FC = () => {
     const handleSelectTab = (_event: unknown, tab: string) => {
       if (isTabValue(tab)) setSelectedTab(tab);
     };
-    window.api?.receive?.("preferences:select-tab", handleSelectTab);
-    return () => {
-      window.api?.removeListener?.("preferences:select-tab", handleSelectTab);
-    };
+    const unsubscribe = window.api?.receive?.(
+      "preferences:select-tab",
+      handleSelectTab
+    );
+    return () => unsubscribe?.();
   }, []);
   const [settings, setSettings] = useState<StoreSchema | null>(null);
   const [isDarkMode] = useState(true);
@@ -148,10 +149,10 @@ export const PreferencesWindow: React.FC = () => {
     );
   }
 
-  const updateSetting = <K extends keyof StoreSchema>(
+  const updateSetting = <K extends keyof StoreSchema, P extends keyof StoreSchema[K]>(
     section: K,
-    key: keyof StoreSchema[K],
-    value: any
+    key: P,
+    value: StoreSchema[K][P]
   ) => {
     const newSettings = {
       ...settings,

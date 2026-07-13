@@ -31,7 +31,6 @@ import {
   Popover,
   PopoverSurface,
   PopoverTrigger,
-  Switch,
   Tooltip,
   makeStyles,
   mergeClasses,
@@ -78,7 +77,6 @@ import {
 import {
   appendToRoot,
   cloneTreeWithNewIds,
-  collectWidgetIds,
   findWidget,
   generateId,
   insertAtEdge,
@@ -98,6 +96,7 @@ import {
   clockTime,
   getTimezoneOffset,
   getTimezoneTime,
+  toDuration,
   toTime,
 } from "./lib/time";
 
@@ -399,6 +398,14 @@ function App() {
     ontimeExpectedFinish: 0,
     loop: false,
     stopped: false,
+    ccgPaused: false,
+    ccgActive: false,
+    ccgClipName: "",
+    ccgBackgroundName: "",
+    ccgBackgroundProducer: "",
+    ccgBackgroundCued: false,
+    ccgFormat: "",
+    ccgFramerate: 0,
     elapsedColor: "",
     remainingColor: "",
     clockColor: "",
@@ -414,6 +421,9 @@ function App() {
       displayTimecode: string;
       videoFormat: string;
       clipId: string;
+      slotStatus: string;
+      volumeName: string;
+      recordingTimeRemaining: number | null;
     }>,
     timezoneClocks: [] as Array<{
       id: string;
@@ -524,10 +534,7 @@ function App() {
     const fullscreenListener = (_event: unknown, fullscreen: boolean) => {
       setIsFullscreen(fullscreen);
     };
-    window.api.receive("window:fullscreen-state", fullscreenListener);
-    return () => {
-      window.api.removeListener("window:fullscreen-state", fullscreenListener);
-    };
+    return window.api.receive("window:fullscreen-state", fullscreenListener);
   }, []);
 
   // Auto-hide the window menu bar after 3s of mouse/keyboard inactivity;
@@ -595,6 +602,14 @@ function App() {
         ontimeExpectedFinish: 0,
         loop: false,
         stopped: false,
+        ccgPaused: false,
+        ccgActive: false,
+        ccgClipName: "",
+        ccgBackgroundName: "",
+        ccgBackgroundProducer: "",
+        ccgBackgroundCued: false,
+        ccgFormat: "",
+        ccgFramerate: 0,
         elapsedColor: "",
         remainingColor: "",
         clockColor: "",
@@ -607,12 +622,12 @@ function App() {
       setState((prev) => ({ ...prev, ...arg }));
     };
 
-    window.api.receive("display:reset", displayResetListener);
-    window.api.receive("timers:update", timersListener);
+    const offReset = window.api.receive("display:reset", displayResetListener);
+    const offTimers = window.api.receive("timers:update", timersListener);
 
     return () => {
-      window.api.removeListener("display:reset", displayResetListener);
-      window.api.removeListener("timers:update", timersListener);
+      offReset();
+      offTimers();
     };
   }, []);
 
@@ -621,10 +636,7 @@ function App() {
       setShowEditor(true);
       setMode("edit");
     };
-    window.api.receive("layout:edit", openEditor);
-    return () => {
-      window.api.removeListener("layout:edit", openEditor);
-    };
+    return window.api.receive("layout:edit", openEditor);
   }, []);
 
   const Status = { RUNNING: 0, HALFWAY: 1, ENDING: 2, ENDED: 3 };
@@ -743,10 +755,7 @@ function App() {
       setMode("preview");
       setShowEditor(false);
     };
-    window.api.receive("layout:load", handleLayoutLoad);
-    return () => {
-      window.api.removeListener("layout:load", handleLayoutLoad);
-    };
+    return window.api.receive("layout:load", handleLayoutLoad);
   }, []);
 
   // Single wall-clock-aligned 1Hz tick that drives every clock/timer in the UI.
@@ -810,10 +819,7 @@ function App() {
         }
       });
     };
-    window.api.receive("osc-timer:command", handleTimerCommand);
-    return () => {
-      window.api.removeListener("osc-timer:command", handleTimerCommand);
-    };
+    return window.api.receive("osc-timer:command", handleTimerCommand);
   }, []);
 
   const handleDockDragStart = (event: React.MouseEvent) => {
@@ -843,7 +849,7 @@ function App() {
     if (widgetKey === "timeOfDayCountdown") {
       return { targetTime: "20:00:00" };
     }
-    if (widgetKey === "recorderStatus") {
+    if (widgetKey === "recorderStatus" || widgetKey === "recorderMedia") {
       const first = state.recorders[0];
       return { recorderId: first?.id };
     }
@@ -988,6 +994,36 @@ function App() {
     setDeleteConfirmOpen(false);
   };
 
+  const renderRecorderPicker = (
+    node: WidgetNode,
+    recorder: (typeof state.recorders)[number] | undefined,
+    recorders: typeof state.recorders
+  ) => (
+    <Dropdown
+      size="small"
+      value={recorder?.label ?? "Pick a recorder"}
+      selectedOptions={[recorder?.id ?? ""]}
+      onOptionSelect={(_e, data) => {
+        if (data.optionValue === "__manage__") {
+          window.api.send("preferences:open", "recorders");
+          return;
+        }
+        handleUpdateWidgetSettings(node.id, {
+          recorderId: data.optionValue || undefined,
+        });
+      }}
+    >
+      {recorders.map((r) => (
+        <Option key={r.id} value={r.id} text={r.label}>
+          {r.label}
+        </Option>
+      ))}
+      <Option value="__manage__" text="Manage recorders…">
+        Manage recorders…
+      </Option>
+    </Dropdown>
+  );
+
   const renderWidgetBody = (node: WidgetNode, isEditing: boolean) => {
     const widget = widgetCatalog[node.widgetKey];
     const colors = getWidgetColors(node.settings);
@@ -1125,6 +1161,158 @@ function App() {
           colors={colors}
           faceAriaLabel={loopAriaLabel}
           faceTitle={loopAriaLabel}
+        />
+      );
+    }
+
+    if (node.widgetKey === "ccgClipName") {
+      const fullName = state.ccgActive ? state.ccgClipName : "";
+      const name = fullName.split(/[\\/]/).pop() || fullName;
+      return (
+        <MonitorWidget
+          label="Now Playing"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={name || "—"}
+          defaultFaceColor={name ? state.clockColor : "#888"}
+          colors={colors}
+          faceStyle={{
+            fontFamily: "inherit",
+            fontSize: "min(8cqw, 18cqh)",
+            padding: "0 4cqw",
+            overflowWrap: "anywhere",
+          }}
+          faceTitle={fullName || undefined}
+        />
+      );
+    }
+
+    if (node.widgetKey === "ccgPaused") {
+      const active = state.ccgActive;
+      const paused = active && state.ccgPaused;
+      const pausedLabel = active ? (paused ? "Paused" : "Playing") : "No clip";
+      const pausedColor = active ? (paused ? "#f59e0b" : "#22c55e") : "#888";
+      return (
+        <MonitorWidget
+          label={pausedLabel}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={
+            active ? (
+              paused ? (
+                <PauseRegular />
+              ) : (
+                <PlayRegular />
+              )
+            ) : (
+              <ProhibitedRegular />
+            )
+          }
+          defaultFaceColor={pausedColor}
+          colors={colors}
+          faceAriaLabel={pausedLabel}
+          faceTitle={pausedLabel}
+        />
+      );
+    }
+
+    if (node.widgetKey === "ccgNextClip") {
+      const cued = state.ccgBackgroundCued;
+      const cuedName =
+        state.ccgBackgroundName.split(/[\\/]/).pop() ||
+        state.ccgBackgroundName ||
+        state.ccgBackgroundProducer;
+      // Flash when the playing clip is about to run out with nothing cued behind it.
+      const notCuedUrgent =
+        !cued &&
+        state.ccgActive &&
+        state.remainingTime > 0 &&
+        state.remainingTime <= 10;
+      return (
+        <MonitorWidget
+          label="Next"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={cued ? cuedName || "CUED" : "NOT CUED"}
+          defaultFaceColor={cued ? state.clockColor : "#888"}
+          colors={colors}
+          ending={notCuedUrgent}
+          faceStyle={{
+            fontFamily: "inherit",
+            fontSize: "min(8cqw, 18cqh)",
+            padding: "0 4cqw",
+            overflowWrap: "anywhere",
+          }}
+          faceTitle={cued ? state.ccgBackgroundName || undefined : "Nothing cued"}
+        />
+      );
+    }
+
+    if (node.widgetKey === "ccgProgress") {
+      const pct =
+        state.totalTime > 0
+          ? Math.min(100, Math.max(0, (state.currentTime / state.totalTime) * 100))
+          : 0;
+      const fill =
+        colors.faceColor ||
+        (state.totalTime > 0 ? remainingTimeColor() || "#22c55e" : "#555");
+      return (
+        <MonitorWidget
+          label="Progress"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={
+            <div
+              style={{
+                width: "84%",
+                height: "22cqh",
+                backgroundColor: "#333",
+                borderRadius: "6px",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: fill,
+                  transform: `scaleX(${pct / 100})`,
+                  transformOrigin: "left",
+                  transition: "transform 0.2s linear",
+                }}
+              />
+            </div>
+          }
+          colors={colors}
+          faceAriaLabel={`Clip progress ${Math.round(pct)}%`}
+          faceTitle={`Clip progress ${Math.round(pct)}%`}
+        />
+      );
+    }
+
+    if (node.widgetKey === "ccgFormat") {
+      const fps =
+        state.ccgFramerate > 0
+          ? Number.isInteger(state.ccgFramerate)
+            ? String(state.ccgFramerate)
+            : state.ccgFramerate.toFixed(2)
+          : "";
+      const display = state.ccgFormat || (fps ? `${fps} fps` : "—");
+      return (
+        <MonitorWidget
+          label="Format"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={display}
+          defaultFaceColor={state.clockColor}
+          colors={colors}
+          faceStyle={{
+            fontFamily: "inherit",
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            fontSize: "min(10cqw, 28cqh)",
+          }}
+          faceTitle={fps ? `${display} (${fps} fps)` : display}
         />
       );
     }
@@ -1331,31 +1519,7 @@ function App() {
           ending={recording}
           faceStyle={{ paddingBottom: "6cqh" }}
           control={
-            isEditing ? (
-              <Dropdown
-                size="small"
-                value={recorder?.label ?? "Pick a recorder"}
-                selectedOptions={[recorder?.id ?? ""]}
-                onOptionSelect={(_e, data) => {
-                  if (data.optionValue === "__manage__") {
-                    window.api.send("preferences:open", "recorders");
-                    return;
-                  }
-                  handleUpdateWidgetSettings(node.id, {
-                    recorderId: data.optionValue || undefined,
-                  });
-                }}
-              >
-                {recorders.map((r) => (
-                  <Option key={r.id} value={r.id} text={r.label}>
-                    {r.label}
-                  </Option>
-                ))}
-                <Option value="__manage__" text="Manage recorders…">
-                  Manage recorders…
-                </Option>
-              </Dropdown>
-            ) : undefined
+            isEditing ? renderRecorderPicker(node, recorder, recorders) : undefined
           }
           overlay={
             recording ? (
@@ -1372,6 +1536,98 @@ function App() {
                 }}
               >
                 ●
+              </span>
+            ) : undefined
+          }
+        />
+      );
+    }
+
+    if (node.widgetKey === "recorderMedia") {
+      const recorders = state.recorders;
+      const recorder =
+        recorders.find((r) => r.id === node.settings?.recorderId) ||
+        recorders[0];
+      const remaining = recorder?.recordingTimeRemaining;
+      const hasMedia =
+        !!recorder?.connected &&
+        recorder.slotStatus === "mounted" &&
+        remaining != null;
+      // Below 5 minutes of record capacity is an alarm, not a statistic.
+      const low = hasMedia && remaining < 300;
+      const mediaTitle = recorder
+        ? recorder.connected
+          ? hasMedia
+            ? `${recorder.volumeName || "Unnamed volume"}: ${toDuration(
+                remaining
+              )} record time left`
+            : `No media mounted (${recorder.slotStatus || "no slot"})`
+          : "Recorder offline"
+        : undefined;
+      return (
+        <MonitorWidget
+          label={`${recorder?.label || "HyperDeck"} media`}
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={hasMedia ? toDuration(remaining) : "--:--:--"}
+          defaultFaceColor={low ? "red" : state.clockColor}
+          colors={colors}
+          ending={low}
+          faceStyle={{ paddingBottom: "6cqh" }}
+          faceTitle={mediaTitle}
+          control={
+            isEditing ? renderRecorderPicker(node, recorder, recorders) : undefined
+          }
+        />
+      );
+    }
+
+    if (node.widgetKey === "recorderAggregate") {
+      const recorders = state.recorders;
+      const total = recorders.length;
+      const recording = recorders.filter((r) => r.status === "record").length;
+      const offline = recorders.filter((r) => !r.connected).length;
+      const allRecording = total > 0 && recording === total;
+      const aggregateColor =
+        total === 0
+          ? "#888"
+          : allRecording
+          ? "#dc2626"
+          : recording > 0
+          ? "#f59e0b"
+          : "#555";
+      return (
+        <MonitorWidget
+          label="Recorders"
+          customLabel={customLabel}
+          showLabel={showLabel}
+          display={total === 0 ? "—" : `${recording}/${total} REC`}
+          defaultFaceColor={aggregateColor}
+          colors={colors}
+          ending={allRecording}
+          faceStyle={{
+            fontFamily: "inherit",
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            fontSize: "min(12cqw, 35cqh)",
+          }}
+          faceAriaLabel={`${recording} of ${total} recorders recording, ${offline} offline`}
+          faceTitle={`${recording} of ${total} recorders recording, ${offline} offline`}
+          overlay={
+            offline > 0 ? (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "3cqh",
+                  right: "3cqw",
+                  fontFamily: "system-ui, sans-serif",
+                  color: "#f59e0b",
+                  fontSize: "min(5cqw, 14cqh)",
+                  lineHeight: 1,
+                  pointerEvents: "none",
+                }}
+              >
+                {offline} OFFLINE
               </span>
             ) : undefined
           }
